@@ -1,0 +1,15 @@
+[Unit]
+Description=Svitlo outage schedule server
+After=network.target
+
+[Service]
+User=svitlo
+WorkingDirectory=/opt/svitlo/server
+EnvironmentFile=/etc/svitlo.env
+StateDirectory=svitlo
+ExecStart=/usr/bin/node /opt/svitlo/server/server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

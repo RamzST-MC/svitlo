@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Світло — керування</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f6fa;--card:#fff;--tx:#1a2233;--mut:#6b7488;--bd:#e1e5ee;--acc:#2f6fed;--on:#2e9d5b;--off:#d9463e;--maybe:#e8a21c}
+@media(prefers-color-scheme:dark){:root{--bg:#0f131b;--card:#181e2a;--tx:#e8ecf5;--mut:#98a2b8;--bd:#2a3244;--acc:#6b9bff}}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,sans-serif}
+main{max-width:780px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 12px}h2{font-size:16px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.mut{color:var(--mut);font-size:13px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.chip{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:6px 12px;cursor:pointer;font:inherit}
+.chip.a{background:var(--acc);color:#fff;border-color:var(--acc)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin:10px 0}
+.c{border:0;border-radius:8px;color:#fff;padding:8px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;font:inherit;font-size:12px;background:var(--on)}
+.c i{font-style:normal;font-size:10px;opacity:.85}.s1{background:var(--off)}.s2{background:var(--maybe)}
+input,textarea{width:100%;box-sizing:border-box;padding:9px;border-radius:9px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit}
+.btn{border:0;background:var(--acc);color:#fff;border-radius:9px;padding:9px 14px;cursor:pointer;font:inherit;margin:6px 6px 0 0}
+.btn.g{background:none;color:var(--acc);border:1px solid var(--bd)}.btn.d{background:var(--off)}
+.msg{padding:8px 12px;border-radius:9px;background:var(--card);border:1px solid var(--bd);margin-bottom:12px}
+</style></head><body><main id="app"></main>
+<script>
+const Q=['1.1','1.2','2.1','2.2','3.1','3.2','4.1','4.2','5.1','5.2','6.1','6.2'];
+const p=n=>String(n).padStart(2,'0');
+const ymd=o=>{const d=new Date();d.setDate(d.getDate()+o);return d.toLocaleDateString('sv-SE')};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let T=localStorage.getItem('tok')||'',D={queues:{}},st={},q='1.1',date=ymd(0),msg='',ok=false,impT='',ntT=null;
+async function api(path,method,body){
+  const r=await fetch(path,{method:method||'GET',headers:{'X-Admin-Token':T,'Content-Type':'text/plain'},body});
+  const t=await r.text();let j={};try{j=JSON.parse(t)}catch{}
+  if(!r.ok)throw new Error(j.error||'HTTP '+r.status);return j}
+async function load(){st=await api('/status');D=await api('/schedule');ok=true}
+async function login(){T=document.getElementById('tk').value.trim();
+  try{await load();localStorage.setItem('tok',T);msg=''}catch(e){ok=false;msg='Помилка входу: '+e.message}render()}
+function logout(){localStorage.removeItem('tok');T='';ok=false;render()}
+async function act(f,m){msg='…';render();try{const r=await f();msg=m(r)}catch(e){msg='Помилка: '+e.message}try{await load()}catch{}render()}
+const day=()=>(D.queues[q]||{})[date]||Array(24).fill(0);
+function put(a){(D.queues[q]=D.queues[q]||{})[date]=a;render()}
+function tap(i){const a=day().slice();a[i]=(a[i]+1)%3;put(a)}
+const fill=v=>put(Array(24).fill(v));
+const save=()=>act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Збережено — застосунки отримають при оновленні');
+const sync=()=>act(()=>api('/sync','POST',''),()=>'Синхронізовано з джерелом');
+const imp=()=>act(()=>api('/import?date='+date,'POST',impT),()=>'Імпортовано на '+date);
+const notice=()=>act(()=>api('/notice','POST',ntT??D.notice??''),()=>{ntT=null;return 'Повідомлення збережено'});
+const upd=()=>confirm('Виконати git pull і перезапустити сервер?')&&act(()=>api('/update','POST',''),r=>'git: '+(r.output||'ok')+' (сервер може перезапуститись)');
+function render(){
+  const el=document.getElementById('app');
+  if(!ok){el.innerHTML=`<h1>⚙️ Світло — керування</h1>${msg?`<div class="msg">${esc(msg)}</div>`:''}<div class="card"><h2>Вхід</h2><input id="tk" type="password" placeholder="Адмін-токен" value="${esc(T)}"><button class="btn" onclick="login()">Увійти</button></div>`;return}
+  const a=day();
+  el.innerHTML=`<h1>⚙️ Світло — керування</h1>${msg?`<div class="msg">${esc(msg)}</div>`:''}
+  <div class="card"><h2>Сервер</h2>
+    <div class="mut">Джерело: ${esc(st.source||'—')} · кожні ${st.everyMinutes||'?'} хв · остання синхронізація: ${esc(st.lastSync||'—')} · версія: ${esc(st.version||'без git')}</div>
+    <button class="btn" onclick="sync()">Синхронізувати зараз</button>
+    <button class="btn g" onclick="upd()">Оновити сервер (git pull)</button>
+    <button class="btn g" onclick="logout()">Вийти</button></div>
+  <div class="card"><h2>Редактор графіка</h2>
+    <input type="date" value="${date}" onchange="date=this.value;render()" style="width:auto">
+    <button class="btn g" onclick="date=ymd(0);render()">Сьогодні</button><button class="btn g" onclick="date=ymd(1);render()">Завтра</button>
+    <div class="chips">${Q.map(x=>`<button class="chip${x===q?' a':''}" onclick="q='${x}';render()">${x}</button>`).join('')}</div>
+    <div class="grid">${a.map((v,i)=>`<button class="c s${v}" onclick="tap(${i})"><b>${p(i)}:00</b><i>–${p(i+1)}:00</i></button>`).join('')}</div>
+    <div class="mut">Клік по годині: є світло → немає → можливо</div>
+    <button class="btn" onclick="save()">Зберегти</button>
+    <button class="btn g" onclick="fill(1)">Усі: немає</button><button class="btn g" onclick="fill(0)">Усі: є</button></div>
+  <div class="card"><h2>Імпорт з тексту</h2><div class="mut">Рядки виду <code>Підчерга 1.1 – 06:00-10:00; 14:00-18:00</code> або <code>1.1: 06:00-10:00</code>. Дата: ${date}</div>
+    <textarea rows="5" oninput="impT=this.value">${esc(impT)}</textarea><button class="btn" onclick="imp()">Імпортувати</button></div>
+  <div class="card"><h2>Повідомлення для користувачів</h2><div class="mut">Показується зверху в застосунку. Порожнє — прибрати.</div>
+    <textarea rows="2" maxlength="500" oninput="ntT=this.value">${esc(ntT??D.notice??'')}</textarea><button class="btn" onclick="notice()">Зберегти повідомлення</button></div>`}
+if(T)load().then(render).catch(()=>{ok=false;render()});else render();
+</script></body></html>
