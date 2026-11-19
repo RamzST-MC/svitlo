@@ -5,23 +5,25 @@ plugins {
 }
 
 // Читаем версии из gradle.properties с резервными значениями
-val versionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
-val versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+val appVersionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
+val appVersionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
 
 android {
     namespace = "ua.svitlo"
     compileSdk = 34
-    
-    defaultConfig { 
+
+    defaultConfig {
         applicationId = "ua.svitlo"
         minSdk = 26
         targetSdk = 34
-        versionCode = versionCode
-        versionName = versionName
+        versionCode = appVersionCode
+        versionName = appVersionName
+        buildConfigField("int", "APP_VERSION_CODE", appVersionCode.toString())
+        buildConfigField("String", "APP_VERSION_NAME", "\"$appVersionName\"")
     }
-    
+
     signingConfigs {
-        create("svitlo") { 
+        create("svitlo") {
             storeFile = file("svitlo.p12")
             storePassword = "svitlo123" // ⚠️ Убедитесь, что этот пароль точно совпадает с паролем от вашего файла svitlo.p12!
             keyAlias = "svitlo"
@@ -29,29 +31,29 @@ android {
             storeType = "pkcs12"
         }
     }
-    
+
     buildTypes {
-        getByName("debug") { 
-            signingConfig = signingConfigs.getByName("svitlo") 
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("svitlo")
         }
         getByName("release") {
             signingConfig = signingConfigs.getByName("svitlo")
             isMinifyEnabled = false
         }
     }
-    
-    buildFeatures { 
+
+    buildFeatures {
         compose = true
-        buildConfig = true 
+        buildConfig = true
     }
-    
-    compileOptions { 
+
+    compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17 
+        targetCompatibility = JavaVersion.VERSION_17
     }
-    
-    kotlinOptions { 
-        jvmTarget = "17" 
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 }
 

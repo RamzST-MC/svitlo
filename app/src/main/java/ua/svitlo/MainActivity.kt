@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import android.os.Bundle
 import androidx.core.content.edit
-import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.net.toUri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -87,8 +86,15 @@ class Repo(ctx: Context) {
             val c = URL("https://api.github.com/repos/$GH_REPO/releases/latest").openConnection() as HttpURLConnection
             c.connectTimeout = 8000; c.readTimeout = 8000
             c.setRequestProperty("User-Agent", "svitlo-app"); c.setRequestProperty("Accept", "application/vnd.github+json")
-            if (c.responseCode == 404) return@runCatching null
-            if (c.responseCode != 200) error("GitHub HTTP ${c.responseCode}")
+            val responseCode = c.responseCode
+            if (responseCode == 404) return@runCatching null
+            if (responseCode != 200) {
+                val errorBody = c.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if ((responseCode == 403) && errorBody.contains("rate limit", ignoreCase = true)) {
+                    error("GitHub тимчасово обмежив перевірки. Спробуйте пізніше.")
+                }
+                error("GitHub HTTP $responseCode")
+            }
             val o = JSONObject(c.inputStream.bufferedReader().readText())
             val tag = o.getString("tag_name").trimStart('v', 'V')
             val v = tag.toIntOrNull() ?: run {
@@ -126,9 +132,8 @@ class VM(app: Application) : AndroidViewModel(app) {
     var updateTestMode by mutableStateOf(false)
     private var lastCheck = 0L
     var updMsg by mutableStateOf("")
-    val installedVersionCode: Long = getApplication<Application>().let { app ->
-        PackageInfoCompat.getLongVersionCode(app.packageManager.getPackageInfo(app.packageName, 0))
-    }
+    val installedVersionCode: Long = BuildConfig.APP_VERSION_CODE.toLong()
+    val installedVersionName: String = BuildConfig.APP_VERSION_NAME
     fun checkUpdate(force: Boolean = false, testMode: Boolean = false) = viewModelScope.launch {
         if (!force && System.currentTimeMillis() - lastCheck < 3_600_000) return@launch
         lastCheck = System.currentTimeMillis()
@@ -304,7 +309,7 @@ fun UserScreen(vm: VM) {
         }
         h = j
     }
-    Text("${vm.status} · версія ${vm.installedVersionCode}", style = MaterialTheme.typography.bodySmall)
+    Text("${vm.status} · версія ${vm.installedVersionName} (${vm.installedVersionCode})", style = MaterialTheme.typography.bodySmall)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { vm.refresh() }) { Text("Оновити графік") }
         OutlinedButton(onClick = { vm.checkUpdate(true) }) { Text("Перевірити оновлення") }
