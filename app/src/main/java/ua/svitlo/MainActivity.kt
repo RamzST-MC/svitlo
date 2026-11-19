@@ -3,15 +3,18 @@ package ua.svitlo
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
+import androidx.core.content.edit
+import androidx.core.content.pm.PackageInfoCompat
+import androidx.core.net.toUri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.minutes
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,11 +60,21 @@ fun toJson(s: Sched) = JSONObject().put("queues", JSONObject().also { o ->
 
 class Repo(ctx: Context) {
     private val sp = ctx.getSharedPreferences("svitlo", 0)
-    var server: String get() = sp.getString("server", "http://10.0.2.2:3000")!!; set(v) = sp.edit().putString("server", v.trim()).apply()
-    var pin: String get() = sp.getString("pin", "1234")!!; set(v) = sp.edit().putString("pin", v).apply()
-    var token: String get() = sp.getString("token", "")!!; set(v) = sp.edit().putString("token", v.trim()).apply()
-    var queue: String get() = sp.getString("queue", "1.1")!!; set(v) = sp.edit().putString("queue", v).apply()
-    var cache: String? get() = sp.getString("cache", null); set(v) = sp.edit().putString("cache", v).apply()
+    var server: String
+        get() = sp.getString("server", "http://10.0.2.2:3000")!!
+        set(v) = sp.edit { putString("server", v.trim()) }
+    var pin: String
+        get() = sp.getString("pin", "1234")!!
+        set(v) = sp.edit { putString("pin", v) }
+    var token: String
+        get() = sp.getString("token", "")!!
+        set(v) = sp.edit { putString("token", v.trim()) }
+    var queue: String
+        get() = sp.getString("queue", "1.1")!!
+        set(v) = sp.edit { putString("queue", v) }
+    var cache: String?
+        get() = sp.getString("cache", null)
+        set(v) = sp.edit { putString("cache", v) }
 
     private fun conn(path: String, method: String) = (URL(server.trimEnd('/') + path).openConnection() as HttpURLConnection).apply {
         requestMethod = method; connectTimeout = 8000; readTimeout = 8000
@@ -105,16 +118,19 @@ class VM(app: Application) : AndroidViewModel(app) {
     var update by mutableStateOf<Pair<Int, String>?>(null)
     private var lastCheck = 0L
     var updMsg by mutableStateOf("")
+    val installedVersionCode: Long = getApplication<Application>().let { app ->
+        PackageInfoCompat.getLongVersionCode(app.packageManager.getPackageInfo(app.packageName, 0))
+    }
     fun checkUpdate(force: Boolean = false) = viewModelScope.launch {
         if (!force && System.currentTimeMillis() - lastCheck < 3_600_000) return@launch
         lastCheck = System.currentTimeMillis()
         if (force) updMsg = "Перевірка…"
         repo.latestRelease().onSuccess { r ->
-            update = r?.takeIf { it.first > BuildConfig.VERSION_CODE }
+            update = r?.takeIf { it.first.toLong() > installedVersionCode }
             if (force) updMsg = when {
                 r == null -> "На GitHub ще немає релізів (перевірте Actions)"
                 update != null -> "Є нова версія ${r.first}"
-                else -> "У вас остання версія: ${BuildConfig.VERSION_CODE}, на GitHub: ${r.first}"
+                else -> "У вас остання версія: $installedVersionCode, на GitHub: ${r.first}"
             }
         }.onFailure { if (force) updMsg = "Не вдалося перевірити: ${it.message}" }
     }
@@ -161,7 +177,7 @@ fun App(vm: VM = viewModel()) {
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
-    LaunchedEffect(Unit) { while (true) { delay(5 * 60_000L); vm.refresh() } }
+    LaunchedEffect(Unit) { while (true) { delay(5.minutes); vm.refresh() } }
     Scaffold(bottomBar = {
         NavigationBar {
             NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("💡") }, label = { Text("Графік") })
@@ -220,7 +236,7 @@ fun UserScreen(vm: VM) {
         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = GREEN.copy(alpha = 0.25f))) {
             Column(Modifier.padding(12.dp)) {
                 Text("Доступна нова версія застосунку (${u.first})")
-                Button(onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u.second))) }) { Text("Завантажити") }
+                Button(onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, u.second.toUri())) }) { Text("Завантажити") }
             }
         }
     }
@@ -275,7 +291,7 @@ fun UserScreen(vm: VM) {
         }
         h = j
     }
-    Text("${vm.status} · версія ${BuildConfig.VERSION_CODE}", style = MaterialTheme.typography.bodySmall)
+    Text("${vm.status} · версія ${vm.installedVersionCode}", style = MaterialTheme.typography.bodySmall)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { vm.refresh() }) { Text("Оновити графік") }
         OutlinedButton(onClick = { vm.checkUpdate(true) }) { Text("Перевірити оновлення") }

@@ -3,21 +3,58 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
-val vc = (project.findProperty("vc") as String?)?.toIntOrNull() ?: 1
+
+// Читаем версии из gradle.properties с резервными значениями
+val versionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
+val versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+
 android {
     namespace = "ua.svitlo"
     compileSdk = 34
-    defaultConfig { applicationId = "ua.svitlo"; minSdk = 26; targetSdk = 34; versionCode = vc; versionName = "1.1.$vc" }
+    
+    defaultConfig { 
+        applicationId = "ua.svitlo"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = versionCode
+        versionName = versionName
+    }
+    
     signingConfigs {
-        create("svitlo") { storeFile = file("svitlo.p12"); storePassword = "svitlo123"; keyAlias = "svitlo"; keyPassword = "svitlo123"; storeType = "pkcs12" }
+        create("svitlo") { 
+            storeFile = file("svitlo.p12")
+            storePassword = "svitlo123" // ⚠️ Убедитесь, что этот пароль точно совпадает с паролем от вашего файла svitlo.p12!
+            keyAlias = "svitlo"
+            keyPassword = "svitlo123"
+            storeType = "pkcs12"
+        }
     }
+    
     buildTypes {
-        getByName("debug") { signingConfig = signingConfigs.getByName("svitlo") }
+        getByName("debug") { 
+            signingConfig = signingConfigs.getByName("svitlo") 
+        }
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("svitlo")
+            isMinifyEnabled = false
+        }
     }
-    buildFeatures { compose = true; buildConfig = true }
-    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-    kotlinOptions { jvmTarget = "17" }
+    
+    buildFeatures { 
+        compose = true
+        buildConfig = true 
+    }
+    
+    compileOptions { 
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17 
+    }
+    
+    kotlinOptions { 
+        jvmTarget = "17" 
+    }
 }
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
     implementation("androidx.compose.material3:material3")
