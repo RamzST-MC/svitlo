@@ -90,7 +90,14 @@ class Repo(ctx: Context) {
             if (c.responseCode == 404) return@runCatching null
             if (c.responseCode != 200) error("GitHub HTTP ${c.responseCode}")
             val o = JSONObject(c.inputStream.bufferedReader().readText())
-            val v = o.getString("tag_name").trim('v', 'V').toIntOrNull() ?: return@runCatching null
+            val tag = o.getString("tag_name").trimStart('v', 'V')
+            val v = tag.toIntOrNull() ?: run {
+                val parts = tag.split('.').mapNotNull(String::toIntOrNull)
+                if (parts.size !in 2..3) return@runCatching null
+                val (major, minor) = parts
+                val patch = parts.getOrElse(2) { 0 }
+                major * 10_000 + minor * 100 + patch
+            }
             val a = o.getJSONArray("assets")
             val url = if (a.length() > 0) a.getJSONObject(0).getString("browser_download_url") else o.getString("html_url")
             v to url
