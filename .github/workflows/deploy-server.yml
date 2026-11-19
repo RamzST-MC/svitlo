@@ -1,0 +1,46 @@
+name: Deploy web server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - ".github/workflows/deploy-server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate server JavaScript
+        run: node --check server/server.js
+        shell: bash
+      - name: Deploy over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${VPS_HOST:?Add VPS_HOST in repository Actions secrets}"
+          : "${VPS_USER:?Add VPS_USER in repository Actions secrets}"
+          : "${VPS_SSH_KEY:?Add VPS_SSH_KEY in repository Actions secrets}"
+          : "${VPS_KNOWN_HOSTS:?Add VPS_KNOWN_HOSTS in repository Actions secrets}"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+          port="${VPS_PORT:-22}"
+          ssh -i ~/.ssh/id_ed25519 -p "$port" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            'sudo -n bash /opt/svitlo/server/update.sh && curl --fail --silent --show-error http://127.0.0.1:3000/schedule >/dev/null'

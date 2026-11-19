@@ -25,3 +25,17 @@ Android Studio → Open → папка проєкту → Run, або візьм
 - Нова версія: змінили код у `app/` → `git push` → GitHub Actions збирає APK і створює Release (v101, v102…).
   Застосунок перевіряє Releases і показує зелену картку «Доступна нова версія» з кнопкою «Завантажити».
 - APK підписаний постійним ключем `app/svitlo.p12`, тому оновлення ставляться поверх старої версії.
+
+## Автодеплой веб-сервера
+
+Workflow `Deploy web server` запускається після push змін у `server/` до `main`. Він перевіряє синтаксис Node.js, підключається до VPS через SSH, виконує `/opt/svitlo/server/update.sh`, перезапускає сервіс і перевіряє endpoint `/schedule`. Його також можна запустити вручну: GitHub → Actions → Deploy web server → Run workflow.
+
+Перед першим запуском додайте в Settings → Secrets and variables → Actions такі secrets:
+
+- `VPS_HOST` — IP-адреса або домен VPS.
+- `VPS_USER` — SSH-користувач для деплою.
+- `VPS_SSH_KEY` — приватний SSH-ключ цього користувача.
+- `VPS_KNOWN_HOSTS` — перевірений рядок хоста з файла `known_hosts`.
+- `VPS_PORT` — SSH-порт; необов’язково, за замовчуванням `22`.
+
+Користувач VPS має мати безпарольне право виконати `sudo -n bash /opt/svitlo/server/update.sh`. Для цього права sudo має бути налаштовано на VPS. Секрети не додавайте в репозиторій.
