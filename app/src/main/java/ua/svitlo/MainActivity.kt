@@ -123,23 +123,29 @@ class VM(app: Application) : AndroidViewModel(app) {
     var admin by mutableStateOf(false)
     var notice by mutableStateOf("")
     var update by mutableStateOf<Pair<Int, String>?>(null)
+    var updateTestMode by mutableStateOf(false)
     private var lastCheck = 0L
     var updMsg by mutableStateOf("")
     val installedVersionCode: Long = getApplication<Application>().let { app ->
         PackageInfoCompat.getLongVersionCode(app.packageManager.getPackageInfo(app.packageName, 0))
     }
-    fun checkUpdate(force: Boolean = false) = viewModelScope.launch {
+    fun checkUpdate(force: Boolean = false, testMode: Boolean = false) = viewModelScope.launch {
         if (!force && System.currentTimeMillis() - lastCheck < 3_600_000) return@launch
         lastCheck = System.currentTimeMillis()
         if (force) updMsg = "Перевірка…"
         repo.latestRelease().onSuccess { r ->
-            update = r?.takeIf { it.first.toLong() > installedVersionCode }
+            updateTestMode = testMode
+            update = r?.takeIf { (versionCode, _) -> testMode || versionCode.toLong() > installedVersionCode }
             if (force) updMsg = when {
                 r == null -> "На GitHub ще немає релізів (перевірте Actions)"
+                testMode -> "Тест пройшов: реліз ${r.first} знайдено. Перевірте картку та кнопку завантаження."
                 update != null -> "Є нова версія ${r.first}"
                 else -> "У вас остання версія: $installedVersionCode, на GitHub: ${r.first}"
             }
-        }.onFailure { if (force) updMsg = "Не вдалося перевірити: ${it.message}" }
+        }.onFailure {
+            updateTestMode = false
+            if (force) updMsg = "Не вдалося перевірити: ${it.message}"
+        }
     }
     fun readNotice() { notice = runCatching { JSONObject(repo.cache ?: "").optString("notice", "") }.getOrDefault("") }
 
@@ -242,7 +248,7 @@ fun UserScreen(vm: VM) {
         val ctx = LocalContext.current
         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = GREEN.copy(alpha = 0.25f))) {
             Column(Modifier.padding(12.dp)) {
-                Text("Доступна нова версія застосунку (${u.first})")
+                Text(if (vm.updateTestMode) "Тестова картка оновлення (${u.first})" else "Доступна нова версія застосунку (${u.first})")
                 Button(onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, u.second.toUri())) }) { Text("Завантажити") }
             }
         }
@@ -302,6 +308,9 @@ fun UserScreen(vm: VM) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { vm.refresh() }) { Text("Оновити графік") }
         OutlinedButton(onClick = { vm.checkUpdate(true) }) { Text("Перевірити оновлення") }
+    }
+    OutlinedButton(onClick = { vm.checkUpdate(force = true, testMode = true) }) {
+        Text("Тестувати перевірку оновлення")
     }
     if (vm.updMsg.isNotBlank()) Text(vm.updMsg, style = MaterialTheme.typography.bodySmall)
 }
