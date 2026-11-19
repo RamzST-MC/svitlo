@@ -74,7 +74,8 @@ class Repo(ctx: Context) {
             val c = URL("https://api.github.com/repos/$GH_REPO/releases/latest").openConnection() as HttpURLConnection
             c.connectTimeout = 8000; c.readTimeout = 8000
             c.setRequestProperty("User-Agent", "svitlo-app"); c.setRequestProperty("Accept", "application/vnd.github+json")
-            if (c.responseCode != 200) return@runCatching null
+            if (c.responseCode == 404) return@runCatching null
+            if (c.responseCode != 200) error("GitHub HTTP ${c.responseCode}")
             val o = JSONObject(c.inputStream.bufferedReader().readText())
             val v = o.getString("tag_name").trim('v', 'V').toIntOrNull() ?: return@runCatching null
             val a = o.getJSONArray("assets")
@@ -103,10 +104,19 @@ class VM(app: Application) : AndroidViewModel(app) {
     var notice by mutableStateOf("")
     var update by mutableStateOf<Pair<Int, String>?>(null)
     private var lastCheck = 0L
-    fun checkUpdate() = viewModelScope.launch {
-        if (System.currentTimeMillis() - lastCheck < 3_600_000) return@launch
+    var updMsg by mutableStateOf("")
+    fun checkUpdate(force: Boolean = false) = viewModelScope.launch {
+        if (!force && System.currentTimeMillis() - lastCheck < 3_600_000) return@launch
         lastCheck = System.currentTimeMillis()
-        repo.latestRelease().onSuccess { r -> update = r?.takeIf { it.first > BuildConfig.VERSION_CODE } }
+        if (force) updMsg = "Перевірка…"
+        repo.latestRelease().onSuccess { r ->
+            update = r?.takeIf { it.first > BuildConfig.VERSION_CODE }
+            if (force) updMsg = when {
+                r == null -> "На GitHub ще немає релізів (перевірте Actions)"
+                update != null -> "Є нова версія ${r.first}"
+                else -> "У вас остання версія: ${BuildConfig.VERSION_CODE}, на GitHub: ${r.first}"
+            }
+        }.onFailure { if (force) updMsg = "Не вдалося перевірити: ${it.message}" }
     }
     fun readNotice() { notice = runCatching { JSONObject(repo.cache ?: "").optString("notice", "") }.getOrDefault("") }
 
@@ -266,7 +276,11 @@ fun UserScreen(vm: VM) {
         h = j
     }
     Text("${vm.status} · версія ${BuildConfig.VERSION_CODE}", style = MaterialTheme.typography.bodySmall)
-    OutlinedButton(onClick = { vm.refresh() }) { Text("Оновити") }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { vm.refresh() }) { Text("Оновити графік") }
+        OutlinedButton(onClick = { vm.checkUpdate(true) }) { Text("Перевірити оновлення") }
+    }
+    if (vm.updMsg.isNotBlank()) Text(vm.updMsg, style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable

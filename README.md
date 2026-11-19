@@ -3,7 +3,7 @@
 ## Git
     git init && git add . && git commit -m "init"
     git branch -M main
-    git remote add origin https://github.com/RamzST-MC/svitlo.git && git push -u origin main
+    git remote add origin https://github.com/RamzST-MC/svitlo && git push -u origin main
 GitHub Actions збирає APK на кожен push: Actions → Build APK → Artifacts → svitlo-debug-apk.
 
 ## Сервер (Ubuntu)

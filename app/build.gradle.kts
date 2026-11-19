@@ -7,7 +7,7 @@ val vc = (project.findProperty("vc") as String?)?.toIntOrNull() ?: 1
 android {
     namespace = "ua.svitlo"
     compileSdk = 34
-    defaultConfig { applicationId = "ua.svitlo"; minSdk = 26; targetSdk = 34; versionCode = vc; versionName = "1.0.$vc" }
+    defaultConfig { applicationId = "ua.svitlo"; minSdk = 26; targetSdk = 34; versionCode = vc; versionName = "1.1.$vc" }
     signingConfigs {
         create("svitlo") { storeFile = file("svitlo.p12"); storePassword = "svitlo123"; keyAlias = "svitlo"; keyPassword = "svitlo123"; storeType = "pkcs12" }
     }
