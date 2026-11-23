@@ -277,6 +277,8 @@ class VM(app: Application) : AndroidViewModel(app) {
     var queue by mutableStateOf(repo.queue)
     var admin by mutableStateOf(false)
     var notice by mutableStateOf("")
+    var maintenance by mutableStateOf(false)
+    var maintenanceMessage by mutableStateOf("")
     var notificationsEnabled by mutableStateOf(repo.notificationsEnabled)
     var update by mutableStateOf<Pair<Int, String>?>(null)
     var updateTestMode by mutableStateOf(false)
@@ -305,8 +307,10 @@ class VM(app: Application) : AndroidViewModel(app) {
     fun readNotice() {
         notice = runCatching {
             val data = JSONObject(repo.cache ?: "")
+            maintenance = data.optBoolean("maintenance")
+            maintenanceMessage = data.optString("maintenanceMessage")
             buildList {
-                if (data.optBoolean("maintenance")) add("Увімкнено режим технічних робіт. Можливі тимчасові перебої.")
+                if (maintenance) add(maintenanceMessage.ifBlank { "У застосунку тривають технічні роботи. Спробуйте пізніше." })
                 data.optString("notice").takeIf(String::isNotBlank)?.let(::add)
             }.joinToString("\n")
         }.getOrDefault("")
@@ -574,7 +578,7 @@ private fun AutoQueueChecker(vm: VM, checkKey: Int) {
         val town = vm.repo.homeTown
         val street = vm.repo.homeStreet
         val house = vm.repo.homeHouse
-        if (town.isNotBlank() && street.isNotBlank() && house.isNotBlank()) {
+        if (!vm.maintenance && town.isNotBlank() && street.isNotBlank() && house.isNotBlank()) {
             webView?.evaluateJavascript(makeAutoQueueScript(town, street, house), null)
         }
     }
@@ -618,7 +622,7 @@ private fun AutoQueueChecker(vm: VM, checkKey: Int) {
                                 val town = vm.repo.homeTown
                                 val street = vm.repo.homeStreet
                                 val house = vm.repo.homeHouse
-                                if (town.isNotBlank() && street.isNotBlank() && house.isNotBlank()) {
+                                if (!vm.maintenance && town.isNotBlank() && street.isNotBlank() && house.isNotBlank()) {
                                     view.evaluateJavascript(makeAutoQueueScript(town, street, house), null)
                                 }
                                 lastCheckKey = checkKey
@@ -670,11 +674,14 @@ fun App(vm: VM = viewModel()) {
     }
     AutoQueueChecker(vm, autoCheckKey)
     val appContext = LocalContext.current
-    LaunchedEffect(vm.sched, vm.queue, vm.notificationsEnabled) {
-        if (vm.notificationsEnabled) PowerNotifications.schedule(appContext, vm.queue, vm.sched)
+    LaunchedEffect(vm.sched, vm.queue, vm.notificationsEnabled, vm.maintenance) {
+        if (vm.notificationsEnabled && !vm.maintenance) PowerNotifications.schedule(appContext, vm.queue, vm.sched)
         else PowerNotifications.cancel(appContext)
     }
-    Scaffold(bottomBar = {
+    if (vm.maintenance) {
+        MaintenanceScreen(vm)
+    } else {
+        Scaffold(bottomBar = {
         NavigationBar {
             NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("💡") }, label = { Text("Графік") })
             NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("🛠️") }, label = { Text("Адмін") })
@@ -688,6 +695,25 @@ fun App(vm: VM = viewModel()) {
                 else -> SettingsScreen(vm)
             }
         }
+    }
+    }
+}
+
+@Composable
+private fun MaintenanceScreen(vm: VM) {
+    Column(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Технічні роботи", style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(16.dp))
+        Text(
+            vm.maintenanceMessage.ifBlank { "У застосунку тривають технічні роботи. Спробуйте пізніше." },
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Spacer(Modifier.height(16.dp))
+        Text("Застосунок буде доступний після завершення робіт.", style = MaterialTheme.typography.bodyMedium)
     }
 }
 

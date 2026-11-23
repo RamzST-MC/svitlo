@@ -26,7 +26,7 @@ const Q=['1.1','1.2','2.1','2.2','3.1','3.2','4.1','4.2','5.1','5.2','6.1','6.2'
 const p=n=>String(n).padStart(2,'0');
 const ymd=o=>{const d=new Date();d.setDate(d.getDate()+o);return d.toLocaleDateString('sv-SE')};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let T=localStorage.getItem('tok')||'',D={queues:{}},st={},q='1.1',date=ymd(0),msg='',ok=false,impT='',ntT=null;
+let T=localStorage.getItem('tok')||'',D={queues:{}},st={},q='1.1',date=ymd(0),msg='',ok=false,impT='',ntT=null,mtT=null;
 async function api(path,method,body){
   const r=await fetch(path,{method:method||'GET',headers:{'X-Admin-Token':T,'Content-Type':'text/plain'},body});
   const t=await r.text();let j={};try{j=JSON.parse(t)}catch{}
@@ -44,7 +44,8 @@ const save=()=>act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Збере�
 const sync=()=>act(()=>api('/sync','POST',''),()=>'Синхронізовано з джерелом');
 const imp=()=>act(()=>api('/import?date='+date,'POST',impT),()=>'Імпортовано на '+date);
 const notice=()=>act(()=>api('/notice','POST',ntT??D.notice??''),()=>{ntT=null;return 'Повідомлення збережено'});
-const setMaintenance=enabled=>{D.maintenance=enabled;return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>enabled?'Режим технічних робіт увімкнено':'Режим технічних робіт вимкнено')};
+const setMaintenance=enabled=>{D.maintenance=enabled;D.maintenanceMessage=mtT??D.maintenanceMessage??'';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>enabled?'Режим технічних робіт увімкнено':'Режим технічних робіт вимкнено')};
+const saveMaintenanceMessage=()=>{D.maintenanceMessage=(mtT??D.maintenanceMessage??'').trim().slice(0,500);return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Повідомлення про технічні роботи збережено')};
 const upd=()=>confirm('Виконати git pull і перезапустити сервер?')&&act(()=>api('/update','POST',''),r=>'git: '+(r.output||'ok')+' (сервер може перезапуститись)');
 function render(){
   const el=document.getElementById('app');
@@ -66,8 +67,10 @@ function render(){
     <button class="btn g" onclick="fill(1)">Усі: немає</button><button class="btn g" onclick="fill(0)">Усі: є</button></div>
   <div class="card"><h2>Імпорт з тексту</h2><div class="mut">Рядки виду <code>Підчерга 1.1 – 06:00-10:00; 14:00-18:00</code> або <code>1.1: 06:00-10:00</code>. Дата: ${date}</div>
     <textarea rows="5" oninput="impT=this.value">${esc(impT)}</textarea><button class="btn" onclick="imp()">Імпортувати</button></div>
-  <div class="card"><h2>Режим технічних робіт</h2><div class="mut">Покажіть користувачам у застосунку повідомлення про тимчасові роботи.</div>
-    <label><input type="checkbox" ${D.maintenance?'checked':''} onchange="setMaintenance(this.checked)">Увімкнути режим технічних робіт</label></div>
+  <div class="card"><h2>Режим технічних робіт</h2><div class="mut">Коли режим увімкнено, застосунок показує лише це повідомлення та блокує інші розділи.</div>
+    <label><input type="checkbox" ${D.maintenance?'checked':''} onchange="setMaintenance(this.checked)">Увімкнути режим технічних робіт</label>
+    <textarea rows="2" maxlength="500" placeholder="Повідомлення користувачам" oninput="mtT=this.value">${esc(mtT??D.maintenanceMessage??'')}</textarea>
+    <button class="btn" onclick="saveMaintenanceMessage()">Зберегти повідомлення технічних робіт</button></div>
   <div class="card"><h2>Повідомлення для користувачів</h2><div class="mut">Показується зверху в застосунку. Порожнє — прибрати.</div>
     <textarea rows="2" maxlength="500" oninput="ntT=this.value">${esc(ntT??D.notice??'')}</textarea><button class="btn" onclick="notice()">Зберегти повідомлення</button></div>`}
 if(T)load().then(render).catch(()=>{ok=false;render()});else render();
