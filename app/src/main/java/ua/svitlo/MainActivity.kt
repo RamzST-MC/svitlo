@@ -701,19 +701,36 @@ fun App(vm: VM = viewModel()) {
 
 @Composable
 private fun MaintenanceScreen(vm: VM) {
+    val pageColor = Color(0xFFFFF7FF)
+    val textColor = Color(0xFF241D2A)
     Column(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),
+        Modifier.fillMaxSize().background(pageColor).padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Технічні роботи", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            "Технічні роботи",
+            color = textColor,
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Spacer(Modifier.height(20.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFEDE3F7))
+        ) {
+            Text(
+                vm.maintenanceMessage.ifBlank { "У застосунку тривають технічні роботи. Спробуйте пізніше." },
+                modifier = Modifier.padding(20.dp),
+                color = textColor,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
         Spacer(Modifier.height(16.dp))
         Text(
-            vm.maintenanceMessage.ifBlank { "У застосунку тривають технічні роботи. Спробуйте пізніше." },
-            style = MaterialTheme.typography.bodyLarge
+            "Застосунок буде доступний після завершення робіт.",
+            color = textColor,
+            style = MaterialTheme.typography.bodyMedium
         )
-        Spacer(Modifier.height(16.dp))
-        Text("Застосунок буде доступний після завершення робіт.", style = MaterialTheme.typography.bodyMedium)
     }
 }
 
