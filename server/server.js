@@ -3,7 +3,7 @@
 const http = require('http'), fs = require('fs'), { execFile, execFileSync } = require('child_process');
 const FILE = process.env.DATA_FILE || __dirname + '/../data/schedule.json', TOKEN = process.env.ADMIN_TOKEN || 'change-me', PORT = process.env.PORT || 3000;
 fs.mkdirSync(require('path').dirname(FILE), { recursive: true });
-const read = () => { try { return JSON.parse(fs.readFileSync(FILE)); } catch { return { queues: {} }; } };
+const read = () => { try { return JSON.parse(fs.readFileSync(FILE)); } catch { return { queues: {}, maintenance: false }; } };
 
 // Розбір тексту: "1.1: 00:00-04:00, 12:00-16:00"
 function importText(text, date) {
