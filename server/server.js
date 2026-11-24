@@ -1,7 +1,7 @@
 // Сервер без залежностей: node server.js   (потрібен Node 18+)
 // ADMIN_TOKEN=секрет PORT=3000 node server.js
-const http = require('http'), fs = require('fs'), { execFile, execFileSync } = require('child_process');
-const FILE = process.env.DATA_FILE || __dirname + '/../data/schedule.json', TOKEN = process.env.ADMIN_TOKEN || 'change-me', PORT = process.env.PORT || 3000;
+const http = require('http'), fs = require('fs'), crypto = require('crypto'), { execFile, execFileSync } = require('child_process');
+const FILE = process.env.DATA_FILE || __dirname + '/../data/schedule.json', ACCESS_FILE = FILE + '.maintenance-access', TOKEN = process.env.ADMIN_TOKEN || 'change-me', PORT = process.env.PORT || 3000;
 fs.mkdirSync(require('path').dirname(FILE), { recursive: true });
 const read = () => { try { return JSON.parse(fs.readFileSync(FILE)); } catch { return { queues: {}, adminAccess: false, maintenance: false, maintenanceMessage: '' }; } };
 
@@ -87,11 +87,24 @@ http.createServer((req, res) => {
   req.on('data', c => body += c).on('end', () => {
     const json = (c, o) => { res.writeHead(c, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
     if (req.method === 'GET' && url.pathname === '/schedule') return json(200, read());
+    if (req.method === 'POST' && url.pathname === '/maintenance-access') {
+      const configured = (() => { try { return fs.readFileSync(ACCESS_FILE, 'utf8').trim(); } catch { return ''; } })();
+      const submitted = crypto.createHash('sha256').update(body.trim()).digest('hex');
+      const valid = configured.length === submitted.length && crypto.timingSafeEqual(Buffer.from(configured), Buffer.from(submitted));
+      return json(valid && body.trim() ? 200 : 403, { authorized: valid && !!body.trim() });
+    }
     if (req.method === 'GET' && (url.pathname === '/admin' || url.pathname === '/')) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(fs.readFileSync(__dirname + '/admin.html'));
     }
     if (req.headers['x-admin-token'] !== TOKEN) return json(401, { error: 'unauthorized' });
     try {
+      if (req.method === 'POST' && url.pathname === '/maintenance-access-config') {
+        const code = body.trim();
+        if (code && code.length < 8) return json(400, { error: 'Код має містити щонайменше 8 символів' });
+        if (!code) { try { fs.unlinkSync(ACCESS_FILE); } catch {} }
+        else fs.writeFileSync(ACCESS_FILE, crypto.createHash('sha256').update(code).digest('hex'), { mode: 0o600 });
+        return json(200, { ok: true });
+      }
       if (req.method === 'POST' && url.pathname === '/sync') { return sync().then(() => json(200, { ok: true, lastSync }), e => json(502, { error: e.message })); }
       if (req.method === 'PUT' && url.pathname === '/schedule') {
         const nd = JSON.parse(body), current = read();

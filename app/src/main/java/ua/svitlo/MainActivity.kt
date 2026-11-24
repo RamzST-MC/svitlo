@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -55,7 +56,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +79,8 @@ import java.net.URL
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlin.math.cos
+import kotlin.math.sin
 
 const val GH_REPO = "RamzST-MC/svitlo"
 val QUEUES = listOf("1.1", "1.2", "2.1", "2.2", "3.1", "3.2", "4.1", "4.2", "5.1", "5.2", "6.1", "6.2")
@@ -225,12 +232,24 @@ class Repo(ctx: Context) {
     var cache: String?
         get() = sp.getString("cache", null)
         set(v) = sp.edit { putString("cache", v) }
+    var maintenanceAccessCode: String
+        get() = sp.getString("maintenance_access_code", "")!!
+        set(v) = sp.edit { putString("maintenance_access_code", v) }
 
     private fun conn(path: String, method: String) = (URL(server.trimEnd('/') + path).openConnection() as HttpURLConnection).apply {
         requestMethod = method; connectTimeout = 8000; readTimeout = 8000
     }
     suspend fun load(): Result<Sched> = withContext(Dispatchers.IO) {
         runCatching { val t = conn("/schedule", "GET").inputStream.bufferedReader().readText(); cache = t; parse(t) }
+    }
+    suspend fun verifyMaintenanceAccess(code: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val c = conn("/maintenance-access", "POST")
+            c.doOutput = true
+            c.setRequestProperty("Content-Type", "text/plain; charset=utf-8")
+            c.outputStream.use { it.write(code.toByteArray(Charsets.UTF_8)) }
+            c.responseCode == 200
+        }.getOrDefault(false)
     }
     suspend fun latestRelease(): Result<Pair<Int, String>?> = withContext(Dispatchers.IO) {
         runCatching {
@@ -288,6 +307,9 @@ class VM(app: Application) : AndroidViewModel(app) {
     var notice by mutableStateOf("")
     var maintenance by mutableStateOf(false)
     var maintenanceMessage by mutableStateOf("")
+    var maintenanceBypass by mutableStateOf(false)
+    var maintenanceAccessCodeInput by mutableStateOf("")
+    var maintenanceAccessStatus by mutableStateOf("")
     var notificationsEnabled by mutableStateOf(repo.notificationsEnabled)
     var update by mutableStateOf<Pair<Int, String>?>(null)
     var updateTestMode by mutableStateOf(false)
@@ -330,11 +352,34 @@ class VM(app: Application) : AndroidViewModel(app) {
         repo.notificationsEnabled = enabled
     }
 
+    fun authorizeDuringMaintenance() = viewModelScope.launch {
+        maintenanceAccessStatus = "Перевіряю код…"
+        val code = maintenanceAccessCodeInput.trim()
+        if (code.isNotBlank() && repo.verifyMaintenanceAccess(code)) {
+            repo.maintenanceAccessCode = code
+            maintenanceBypass = true
+            maintenanceAccessCodeInput = ""
+            maintenanceAccessStatus = "Доступ надано"
+        } else {
+            maintenanceAccessStatus = "Код невірний або доступ не налаштований"
+        }
+    }
+
     init { repo.cache?.let { runCatching { sched = parse(it) }; readNotice() }; refresh() }
 
     fun refresh() = viewModelScope.launch {
         status = "Оновлення…"
-        repo.load().onSuccess { sched = it; status = "Оновлено"; readNotice() }.onFailure { status = "Немає зв’язку з сервером, показано збережені дані" }
+        repo.load().onSuccess {
+            sched = it
+            status = "Оновлено"
+            readNotice()
+            if (maintenance) {
+                maintenanceBypass = repo.maintenanceAccessCode.isNotBlank() && repo.verifyMaintenanceAccess(repo.maintenanceAccessCode)
+            } else {
+                maintenanceBypass = false
+                repo.maintenanceAccessCode = ""
+            }
+        }.onFailure { status = "Немає зв’язку з сервером, показано збережені дані" }
     }
     fun day(q: String, date: String) = sched[q]?.get(date) ?: List(24) { 0 }
     fun cycle(q: String, date: String, h: Int) {
@@ -695,7 +740,7 @@ fun App(vm: VM = viewModel()) {
         if (vm.notificationsEnabled && !vm.maintenance) PowerNotifications.schedule(appContext, vm.queue, vm.sched)
         else PowerNotifications.cancel(appContext)
     }
-    if (vm.maintenance) {
+    if (vm.maintenance && !vm.maintenanceBypass) {
         MaintenanceScreen(vm)
     } else {
         Scaffold(bottomBar = {
@@ -721,6 +766,42 @@ fun App(vm: VM = viewModel()) {
 }
 
 @Composable
+private fun MaintenanceIllustration() {
+    Canvas(Modifier.size(190.dp)) {
+        val scale = size.width / 180f
+        fun point(x: Float, y: Float) = Offset(x * scale, y * scale)
+        val purple = Color(0xFF7657B5)
+        val dark = Color(0xFF4E4560)
+
+        drawCircle(Color(0xFFEDE3F7), radius = 84f * scale, center = point(90f, 90f))
+        drawCircle(Color.White.copy(alpha = 0.62f), radius = 58f * scale, center = point(90f, 105f))
+        drawCircle(purple.copy(alpha = 0.32f), radius = 43f * scale, center = point(90f, 108f), style = Stroke(6f * scale))
+        for (i in 0 until 8) {
+            val angle = i * Math.PI / 4.0
+            val x = cos(angle).toFloat()
+            val y = sin(angle).toFloat()
+            drawLine(purple.copy(alpha = 0.45f), point(90f + x * 43f, 108f + y * 43f), point(90f + x * 52f, 108f + y * 52f), 5f * scale)
+        }
+        drawCircle(purple.copy(alpha = 0.32f), radius = 17f * scale, center = point(90f, 108f), style = Stroke(5f * scale))
+
+        drawRoundRect(Color(0xFF86B8A2), point(52f, 100f), Size(76f * scale, 49f * scale), CornerRadius(20f * scale))
+        drawCircle(Color(0xFFFFD3B0), radius = 22f * scale, center = point(90f, 76f))
+        drawCircle(dark, radius = 2f * scale, center = point(82f, 77f))
+        drawCircle(dark, radius = 2f * scale, center = point(98f, 77f))
+        drawLine(Color(0xFFB66F63), point(84f, 88f), point(96f, 88f), 2f * scale)
+
+        drawRoundRect(Color(0xFFFFC857), point(63f, 52f), Size(54f * scale, 17f * scale), CornerRadius(9f * scale))
+        drawRoundRect(Color(0xFFFFC857), point(57f, 65f), Size(66f * scale, 8f * scale), CornerRadius(4f * scale))
+        drawRoundRect(Color(0xFFFFE29A), point(87f, 53f), Size(6f * scale, 14f * scale), CornerRadius(3f * scale))
+
+        drawLine(purple, point(48f, 127f), point(61f, 114f), 6f * scale)
+        drawCircle(Color(0xFFFFC857), radius = 7f * scale, center = point(46f, 130f), style = Stroke(4f * scale))
+        drawLine(Color(0xFFE59B45), point(119f, 116f), point(133f, 130f), 6f * scale)
+        drawRoundRect(Color(0xFFE59B45), point(129f, 128f), Size(9f * scale, 17f * scale), CornerRadius(4f * scale))
+    }
+}
+
+@Composable
 private fun MaintenanceScreen(vm: VM) {
     val pageColor = Color(0xFFFFF7FF)
     val textColor = Color(0xFF241D2A)
@@ -729,6 +810,8 @@ private fun MaintenanceScreen(vm: VM) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        MaintenanceIllustration()
+        Spacer(Modifier.height(16.dp))
         Text(
             "Технічні роботи",
             color = textColor,
@@ -752,6 +835,23 @@ private fun MaintenanceScreen(vm: VM) {
             color = textColor,
             style = MaterialTheme.typography.bodyMedium
         )
+        Spacer(Modifier.height(24.dp))
+        OutlinedTextField(
+            value = vm.maintenanceAccessCodeInput,
+            onValueChange = { vm.maintenanceAccessCodeInput = it; vm.maintenanceAccessStatus = "" },
+            label = { Text("Код доступу") },
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = { vm.authorizeDuringMaintenance() },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = vm.maintenanceAccessCodeInput.isNotBlank()
+        ) { Text("Увійти з кодом доступу") }
+        if (vm.maintenanceAccessStatus.isNotBlank()) {
+            Text(vm.maintenanceAccessStatus, color = textColor, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 
