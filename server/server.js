@@ -3,7 +3,20 @@
 const http = require('http'), fs = require('fs'), crypto = require('crypto'), { execFile, execFileSync } = require('child_process');
 const FILE = process.env.DATA_FILE || __dirname + '/../data/schedule.json', ACCESS_FILE = FILE + '.maintenance-access', TOKEN = process.env.ADMIN_TOKEN || 'change-me', PORT = process.env.PORT || 3000;
 fs.mkdirSync(require('path').dirname(FILE), { recursive: true });
-const read = () => { try { return JSON.parse(fs.readFileSync(FILE)); } catch { return { queues: {}, adminAccess: false, maintenance: false, maintenanceMessage: '' }; } };
+const read = () => {
+  let data;
+  try { data = JSON.parse(fs.readFileSync(FILE)); }
+  catch { data = { queues: {}, adminAccess: false, maintenance: false, maintenanceMessage: '' }; }
+  if (data.maintenanceUntil) {
+    const end = Date.parse(data.maintenanceUntil);
+    if (!Number.isFinite(end) || end <= Date.now()) {
+      data.maintenance = false;
+      data.maintenanceUntil = '';
+      fs.writeFileSync(FILE, JSON.stringify(data));
+    }
+  }
+  return data;
+};
 
 // Розбір тексту: "1.1: 00:00-04:00, 12:00-16:00"
 function importText(text, date) {
@@ -112,6 +125,7 @@ http.createServer((req, res) => {
         if (nd.adminAccess === undefined) nd.adminAccess = current.adminAccess || false;
         if (nd.maintenance === undefined) nd.maintenance = current.maintenance || false;
         if (nd.maintenanceMessage === undefined) nd.maintenanceMessage = current.maintenanceMessage || '';
+        if (nd.maintenanceUntil === undefined) nd.maintenanceUntil = current.maintenanceUntil || '';
         fs.writeFileSync(FILE, JSON.stringify(nd)); return json(200, { ok: true });
       }
       if (req.method === 'GET' && url.pathname === '/status') {
