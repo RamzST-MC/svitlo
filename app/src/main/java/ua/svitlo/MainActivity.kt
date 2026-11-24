@@ -32,6 +32,7 @@ import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.Toast
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -343,7 +344,7 @@ class VM(app: Application) : AndroidViewModel(app) {
 }
 
 object PowerNotifications {
-    private const val CHANNEL_ID = "power_schedule_alerts"
+    private const val CHANNEL_ID = "power_schedule_alerts_v2"
     private const val PREFS = "scheduled_power_notifications"
     private const val IDS_KEY = "ids"
 
@@ -438,14 +439,18 @@ object PowerNotifications {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
-        val id = System.currentTimeMillis().toInt()
-        val notification = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Перевірка звуку сповіщення")
-            .setContentText("Якщо чутно звук, сповіщення працюють.")
-            .setAutoCancel(true)
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val ringtone = soundUri?.let { RingtoneManager.getRingtone(context, it) }
+        ringtone?.audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
-        context.getSystemService(NotificationManager::class.java).notify(id, notification)
+        ringtone?.play()
+        ringtone?.let { sound ->
+            Handler(Looper.getMainLooper()).postDelayed({ if (sound.isPlaying) sound.stop() }, 2500)
+        }
+
+        Toast.makeText(context, "Тестовий звук сповіщення відтворено", Toast.LENGTH_SHORT).show()
     }
 
     fun cancel(context: Context) {
