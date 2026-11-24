@@ -410,7 +410,7 @@ function render(){
 
         <table class="info-table">
           <tr><td>Джерело:</td><td><strong>${esc(st.source||'—')}</strong></td></tr>
-          <tr><td>Автосинхронізація:</td><td><strong>кожні ${st.everyMinutes||'?'} хв</strong></td></tr>
+          <tr><td>Автосинхронізація:</td><td><strong>кожні ${st.everySeconds||15} с</strong></td></tr>
           <tr><td>Остання синхронізація:</td><td><strong>${esc(st.lastSync||'—')}</strong></td></tr>
           <tr><td>Версія коду:</td><td><strong>${esc(st.version||'—')}</strong></td></tr>
         </table>

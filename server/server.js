@@ -33,7 +33,7 @@ function importText(text, date) {
 
 // Автосинхронізація. За замовчуванням — сайт Хмельницькобленерго (hoe.com.ua). SOURCE_URL=off вимикає, SOURCE_URL=https://... — довільне джерело.
 // Джерело може віддавати JSON {"queues":{"1.1":{"2026-11-19":[24 числа]}}} або текст/HTML з рядками "1.1: 00:00-04:00, 12:00-16:00".
-const SOURCE = process.env.SOURCE_URL || 'hoe', EVERY = (+process.env.SYNC_MINUTES || 15) * 60000;
+const SOURCE = process.env.SOURCE_URL || 'hoe', EVERY = (+process.env.SYNC_SECONDS || 15) * 1000;
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Kyiv' });
 let lastSync = 'ще не було';
 async function syncGeneric() {
@@ -155,7 +155,7 @@ http.createServer((req, res) => {
       }
       if (req.method === 'GET' && url.pathname === '/status') {
         let version = ''; try { version = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname }).toString().trim(); } catch {}
-        return json(200, { lastSync, source: SOURCE, everyMinutes: EVERY / 60000, version });
+        return json(200, { lastSync, source: SOURCE, everySeconds: EVERY / 1000, version });
       }
       if (req.method === 'POST' && url.pathname === '/notice') { const d = read(); d.notice = body.trim().slice(0, 500); fs.writeFileSync(FILE, JSON.stringify(d)); return json(200, { ok: true }); }
       if (req.method === 'POST' && url.pathname === '/update') {
