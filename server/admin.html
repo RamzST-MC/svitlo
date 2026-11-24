@@ -260,14 +260,21 @@ function enableMaintenanceFor(minutes) {
   if (!Number.isInteger(duration) || duration < 1 || duration > 10080) {
     msg = 'Вкажіть тривалість від 1 до 10080 хвилин'; render(); return;
   }
-  const end = new Date(Date.now() + duration * 60000);
-  D.maintenance = true;
-  D.maintenanceUntil = end.toISOString();
-  D.maintenanceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  D.maintenanceMessage = mtT ?? D.maintenanceMessage ?? '';
+  const payload = {
+    ...D,
+    maintenance: true,
+    maintenanceMinutes: duration,
+    maintenanceTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    maintenanceMessage: mtT ?? D.maintenanceMessage ?? ''
+  };
   const hours = Math.floor(duration / 60), mins = duration % 60;
   const durLabel = (hours ? hours + ' год ' : '') + (mins ? mins + ' хв' : '');
-  return act(() => api('/schedule', 'PUT', JSON.stringify(D)), () => 'Технічні роботи увімкнено на ' + durLabel.trim() + ' до ' + end.toLocaleString());
+  return act(async () => {
+    const r = await api('/schedule', 'PUT', JSON.stringify(payload));
+    if (r.maintenanceUntil) D.maintenanceUntil = r.maintenanceUntil;
+    D.maintenance = true;
+    return r;
+  }, () => 'Технічні роботи увімкнено на ' + durLabel.trim() + (D.maintenanceUntil ? ' до ' + new Date(D.maintenanceUntil).toLocaleString() : ''));
 }
 
 function enableMaintenanceFromInput() {

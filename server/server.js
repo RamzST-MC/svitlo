@@ -126,9 +126,16 @@ http.createServer((req, res) => {
         if (nd.adminAccess === undefined) nd.adminAccess = current.adminAccess || false;
         if (nd.maintenance === undefined) nd.maintenance = current.maintenance || false;
         if (nd.maintenanceMessage === undefined) nd.maintenanceMessage = current.maintenanceMessage || '';
-        if (nd.maintenanceUntil === undefined) nd.maintenanceUntil = current.maintenanceUntil || '';
+        if (nd.maintenanceMinutes && Number.isInteger(Number(nd.maintenanceMinutes))) {
+          const mins = Number(nd.maintenanceMinutes);
+          nd.maintenance = true;
+          nd.maintenanceUntil = new Date(Date.now() + mins * 60000).toISOString();
+          delete nd.maintenanceMinutes;
+        } else if (nd.maintenanceUntil === undefined) {
+          nd.maintenanceUntil = current.maintenanceUntil || '';
+        }
         if (nd.maintenanceTimeZone === undefined) nd.maintenanceTimeZone = current.maintenanceTimeZone || '';
-        fs.writeFileSync(FILE, JSON.stringify(nd)); return json(200, { ok: true });
+        fs.writeFileSync(FILE, JSON.stringify(nd)); return json(200, { ok: true, maintenanceUntil: nd.maintenanceUntil });
       }
       if (req.method === 'GET' && url.pathname === '/status') {
         let version = ''; try { version = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname }).toString().trim(); } catch {}
