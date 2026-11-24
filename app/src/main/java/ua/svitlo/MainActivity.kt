@@ -848,7 +848,7 @@ private fun MaintenanceScreen(vm: VM) {
         runCatching { Instant.parse(vm.maintenanceUntil).toEpochMilli() }.getOrNull()
     }
     val maintenanceZone = remember(vm.maintenanceTimeZone) {
-        runCatching { ZoneId.of(vm.maintenanceTimeZone) }.getOrElse { ZoneId.systemDefault() }
+        runCatching { ZoneId.of(vm.maintenanceTimeZone) }.getOrElse { ZoneId.of("Europe/Moscow") }
     }
     val pageColor = MaterialTheme.colorScheme.background
     val textColor = MaterialTheme.colorScheme.onBackground
