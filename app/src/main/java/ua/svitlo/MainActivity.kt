@@ -313,6 +313,7 @@ class VM(app: Application) : AndroidViewModel(app) {
     var maintenance by mutableStateOf(false)
     var maintenanceMessage by mutableStateOf("")
     var maintenanceUntil by mutableStateOf("")
+    var maintenanceTimeZone by mutableStateOf("")
     var maintenanceBypass by mutableStateOf(false)
     var maintenanceAccessCodeInput by mutableStateOf("")
     var maintenanceAccessStatus by mutableStateOf("")
@@ -349,6 +350,7 @@ class VM(app: Application) : AndroidViewModel(app) {
             maintenance = data.optBoolean("maintenance")
             maintenanceMessage = data.optString("maintenanceMessage")
             maintenanceUntil = data.optString("maintenanceUntil")
+            maintenanceTimeZone = data.optString("maintenanceTimeZone")
             buildList {
                 if (maintenance) add(maintenanceMessage.ifBlank { "У застосунку тривають технічні роботи. Спробуйте пізніше." })
                 data.optString("notice").takeIf(String::isNotBlank)?.let(::add)
@@ -782,8 +784,6 @@ fun App(vm: VM = viewModel()) {
             NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("💡") }, label = { Text("Графік") })
             if (adminTabEnabled) {
                 NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("🛠️") }, label = { Text("Адмін") })
-            } else {
-                Spacer(Modifier.weight(1f))
             }
             NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = { Text("⚙️") }, label = { Text("Налаштування") })
         }
@@ -847,6 +847,9 @@ private fun MaintenanceScreen(vm: VM) {
     val maintenanceEndMillis = remember(vm.maintenanceUntil) {
         runCatching { Instant.parse(vm.maintenanceUntil).toEpochMilli() }.getOrNull()
     }
+    val maintenanceZone = remember(vm.maintenanceTimeZone) {
+        runCatching { ZoneId.of(vm.maintenanceTimeZone) }.getOrElse { ZoneId.systemDefault() }
+    }
     val pageColor = MaterialTheme.colorScheme.background
     val textColor = MaterialTheme.colorScheme.onBackground
     Column(
@@ -886,8 +889,8 @@ private fun MaintenanceScreen(vm: VM) {
             val minutes = (remaining / 60_000) % 60
             val seconds = (remaining / 1_000) % 60
             val endTime = Instant.ofEpochMilli(endMillis)
-                .atZone(ZoneId.systemDefault())
-                .format(DateTimeFormatter.ofPattern("dd.MM HH:mm"))
+                .atZone(maintenanceZone)
+                .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
             Text(
                 "До завершення: %02d:%02d:%02d".format(hours, minutes, seconds),
                 color = MaterialTheme.colorScheme.primary,

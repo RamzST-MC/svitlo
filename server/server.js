@@ -12,6 +12,7 @@ const read = () => {
     if (!Number.isFinite(end) || end <= Date.now()) {
       data.maintenance = false;
       data.maintenanceUntil = '';
+      data.maintenanceTimeZone = '';
       fs.writeFileSync(FILE, JSON.stringify(data));
     }
   }
@@ -126,6 +127,7 @@ http.createServer((req, res) => {
         if (nd.maintenance === undefined) nd.maintenance = current.maintenance || false;
         if (nd.maintenanceMessage === undefined) nd.maintenanceMessage = current.maintenanceMessage || '';
         if (nd.maintenanceUntil === undefined) nd.maintenanceUntil = current.maintenanceUntil || '';
+        if (nd.maintenanceTimeZone === undefined) nd.maintenanceTimeZone = current.maintenanceTimeZone || '';
         fs.writeFileSync(FILE, JSON.stringify(nd)); return json(200, { ok: true });
       }
       if (req.method === 'GET' && url.pathname === '/status') {
