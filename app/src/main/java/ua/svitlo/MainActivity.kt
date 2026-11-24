@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
@@ -779,7 +780,13 @@ fun UserScreen(vm: VM, refreshCountdown: Int) {
     val left = i * 60 - now.minute
 
     Text("Графік відключень", style = MaterialTheme.typography.headlineSmall)
-    Text("Ваша черга: ${vm.queue}", style = MaterialTheme.typography.titleMedium, color = GREEN)
+    Text(
+        "Ваша черга: ${vm.queue}",
+        modifier = Modifier.fillMaxWidth(),
+        style = MaterialTheme.typography.headlineSmall,
+        color = GREEN,
+        textAlign = TextAlign.Center
+    )
     if (vm.notice.isNotBlank()) Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AMBER.copy(alpha = 0.25f))) { Text(vm.notice, Modifier.padding(12.dp)) }
     vm.update?.let { u ->
         val ctx = LocalContext.current
@@ -848,16 +855,11 @@ fun UserScreen(vm: VM, refreshCountdown: Int) {
         "${vm.status} · версія ${vm.installedVersionName} (${vm.installedVersionCode}) · наступне оновлення через ${refreshCountdown} с",
         style = MaterialTheme.typography.bodySmall
     )
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    OutlinedButton(
+        onClick = { vm.refresh() },
+        modifier = Modifier.fillMaxWidth()
     ) {
-        OutlinedButton(onClick = { vm.refresh() }, modifier = Modifier.weight(1f)) {
-            Text("Оновити графік")
-        }
-        OutlinedButton(onClick = { vm.checkUpdate(force = true) }, modifier = Modifier.weight(1f)) {
-            Text("Перевірити оновлення")
-        }
+        Text("Оновити графік")
     }
 }
 
@@ -1333,6 +1335,14 @@ fun SettingsScreen(vm: VM) {
 
     Text("Оновлення", style = MaterialTheme.typography.titleLarge)
     Text("Версія ${vm.installedVersionName} (${vm.installedVersionCode})", style = MaterialTheme.typography.bodySmall)
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        OutlinedButton(
+            onClick = { vm.checkUpdate(force = true) },
+            modifier = Modifier.fillMaxWidth(0.86f).height(60.dp)
+        ) {
+            Text("Перевірити оновлення", fontSize = 18.sp, textAlign = TextAlign.Center)
+        }
+    }
     OutlinedButton(onClick = { vm.checkUpdate(force = true, testMode = true) }) {
         Text("Тестувати перевірку оновлення")
     }
