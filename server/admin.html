@@ -306,12 +306,16 @@ function render(){
     <header>
       <h1>⚡ Світло — Панель керування</h1>
       <div class="header-badges">
-        ${D.maintenance ? '<span class="badge active">⚠️ Техроботи</span>' : '<span class="badge ok">● Сервер працює</span>'}
+        <span class="badge ok">● Сервер працює</span>
+        ${D.maintenance ? '<span class="badge active">⚠️ Техроботи активні</span>' : ''}
         <span class="badge">v${esc(st.version||'dev')}</span>
       </div>
     </header>
 
-    ${msg?`<div class="msg">${esc(msg)}</div>`:''}
+    ${msg ? `<div class="msg" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>${esc(msg)}</span>
+        <button onclick="msg='';render()" style="background:none; border:0; color:var(--tx); cursor:pointer; font-weight:bold; padding:0 4px;">✕</button>
+      </div>` : ''}
 
     <div class="layout-grid">
       <!-- MAIN SCHEDULE EDITOR CARD -->
@@ -346,7 +350,15 @@ function render(){
         <div class="card-title">🛠️ Технічні роботи</div>
         <div class="mut">Обмежте доступ користувачів до застосунку під час оновлень або обслуговування.</div>
 
-        ${D.maintenance ? `<div class="msg" style="margin-bottom:12px;"><strong>Увімкнено:</strong> ${D.maintenanceUntil ? 'до ' + esc(new Date(D.maintenanceUntil).toLocaleString()) : 'без таймера'}</div>` : ''}
+        ${D.maintenance ? `
+          <div class="msg" style="background:rgba(245, 158, 11, 0.15); border-color:var(--warn); color:var(--tx); margin-bottom:14px;">
+            ⚠️ <strong>Технічні роботи увімкнено:</strong> ${D.maintenanceUntil ? 'до ' + esc(new Date(D.maintenanceUntil).toLocaleString()) : 'без таймера'}
+          </div>
+        ` : `
+          <div style="font-size:13px; color:var(--on); background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.3); padding:8px 12px; border-radius:8px; margin-bottom:14px;">
+            ✅ Технічні роботи вимкнено (застосунок відкритий для всіх)
+          </div>
+        `}
 
         <label>Установити тривалість робіт</label>
         <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
