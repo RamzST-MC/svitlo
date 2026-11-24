@@ -232,6 +232,9 @@ class Repo(ctx: Context) {
     var cache: String?
         get() = sp.getString("cache", null)
         set(v) = sp.edit { putString("cache", v) }
+    var themeMode: String
+        get() = sp.getString("theme_mode", "system")!!
+        set(v) = sp.edit { putString("theme_mode", v) }
     var maintenanceAccessCode: String
         get() = sp.getString("maintenance_access_code", "")!!
         set(v) = sp.edit { putString("maintenance_access_code", v) }
@@ -310,6 +313,7 @@ class VM(app: Application) : AndroidViewModel(app) {
     var maintenanceBypass by mutableStateOf(false)
     var maintenanceAccessCodeInput by mutableStateOf("")
     var maintenanceAccessStatus by mutableStateOf("")
+    var themeMode by mutableStateOf(repo.themeMode)
     var notificationsEnabled by mutableStateOf(repo.notificationsEnabled)
     var update by mutableStateOf<Pair<Int, String>?>(null)
     var updateTestMode by mutableStateOf(false)
@@ -350,6 +354,18 @@ class VM(app: Application) : AndroidViewModel(app) {
     fun updateNotificationsEnabled(enabled: Boolean) {
         notificationsEnabled = enabled
         repo.notificationsEnabled = enabled
+    }
+
+    fun changeThemeMode(mode: String) {
+        themeMode = mode
+        repo.themeMode = mode
+    }
+
+    fun leaveMaintenanceAccess() {
+        repo.maintenanceAccessCode = ""
+        maintenanceBypass = false
+        maintenanceAccessCodeInput = ""
+        maintenanceAccessStatus = ""
     }
 
     fun authorizeDuringMaintenance() = viewModelScope.launch {
@@ -553,7 +569,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         PowerNotifications.createChannel(this)
-        setContent { MaterialTheme(colorScheme = if (androidx.compose.foundation.isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) { App() } }
+        setContent { SvitloRoot() }
+    }
+}
+
+@Composable
+private fun SvitloRoot() {
+    val vm: VM = viewModel()
+    val darkTheme = when (vm.themeMode) {
+        "dark" -> true
+        "light" -> false
+        else -> androidx.compose.foundation.isSystemInDarkTheme()
+    }
+    MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
+        App(vm)
     }
 }
 
@@ -732,8 +761,9 @@ fun App(vm: VM = viewModel()) {
         }
     }
     AutoQueueChecker(vm, autoCheckKey)
-    LaunchedEffect(vm.adminAccess) {
-        if (!vm.adminAccess && tab == 1) tab = 0
+    val adminTabEnabled = vm.adminAccess && vm.maintenance && vm.maintenanceBypass
+    LaunchedEffect(adminTabEnabled) {
+        if (!adminTabEnabled && tab == 1) tab = 0
     }
     val appContext = LocalContext.current
     LaunchedEffect(vm.sched, vm.queue, vm.notificationsEnabled, vm.maintenance) {
@@ -746,7 +776,7 @@ fun App(vm: VM = viewModel()) {
         Scaffold(bottomBar = {
         NavigationBar {
             NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("💡") }, label = { Text("Графік") })
-            if (vm.adminAccess) {
+            if (adminTabEnabled) {
                 NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("🛠️") }, label = { Text("Адмін") })
             } else {
                 Spacer(Modifier.weight(1f))
@@ -803,8 +833,8 @@ private fun MaintenanceIllustration() {
 
 @Composable
 private fun MaintenanceScreen(vm: VM) {
-    val pageColor = Color(0xFFFFF7FF)
-    val textColor = Color(0xFF241D2A)
+    val pageColor = MaterialTheme.colorScheme.background
+    val textColor = MaterialTheme.colorScheme.onBackground
     Column(
         Modifier.fillMaxSize().background(pageColor).padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -820,7 +850,7 @@ private fun MaintenanceScreen(vm: VM) {
         Spacer(Modifier.height(20.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFEDE3F7))
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
         ) {
             Text(
                 vm.maintenanceMessage.ifBlank { "У застосунку тривають технічні роботи. Спробуйте пізніше." },
@@ -1155,6 +1185,22 @@ fun SettingsScreen(vm: VM) {
             })();
         """.trimIndent()
         webView?.evaluateJavascript(script, null)
+    }
+
+    Text("Тема застосунку", style = MaterialTheme.typography.titleLarge)
+    listOf("system" to "Як у системі", "light" to "Світла", "dark" to "Темна").forEach { (mode, label) ->
+        Row(
+            Modifier.fillMaxWidth().clickable { vm.changeThemeMode(mode) },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RadioButton(selected = vm.themeMode == mode, onClick = { vm.changeThemeMode(mode) })
+            Text(label)
+        }
+    }
+    if (vm.maintenance && vm.maintenanceBypass) {
+        OutlinedButton(onClick = { vm.leaveMaintenanceAccess() }, modifier = Modifier.fillMaxWidth()) {
+            Text("Вийти з доступу на час технічних робіт")
+        }
     }
 
     Text("Моя адреса", style = MaterialTheme.typography.headlineSmall)
