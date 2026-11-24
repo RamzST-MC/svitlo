@@ -108,7 +108,8 @@ http.createServer((req, res) => {
       return json(valid && body.trim() ? 200 : 403, { authorized: valid && !!body.trim() });
     }
     if (req.method === 'GET' && (url.pathname === '/admin' || url.pathname === '/')) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(fs.readFileSync(__dirname + '/admin.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+      return res.end(fs.readFileSync(__dirname + '/admin.html'));
     }
     if (req.headers['x-admin-token'] !== TOKEN) return json(401, { error: 'unauthorized' });
     try {
