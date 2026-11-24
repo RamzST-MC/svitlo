@@ -99,7 +99,7 @@ http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Headers', '*'); res.setHeader('Access-Control-Allow-Methods', '*');
   if (req.method === 'OPTIONS') return res.end();
   req.on('data', c => body += c).on('end', () => {
-    const json = (c, o) => { res.writeHead(c, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+    const json = (c, o) => { res.writeHead(c, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
     if (req.method === 'GET' && url.pathname === '/schedule') return json(200, read());
     if (req.method === 'POST' && url.pathname === '/maintenance-access') {
       const configured = (() => { try { return fs.readFileSync(ACCESS_FILE, 'utf8').trim(); } catch { return ''; } })();
