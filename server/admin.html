@@ -44,7 +44,8 @@ const save=()=>act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Збере�
 const sync=()=>act(()=>api('/sync','POST',''),()=>'Синхронізовано з джерелом');
 const imp=()=>act(()=>api('/import?date='+date,'POST',impT),()=>'Імпортовано на '+date);
 const notice=()=>act(()=>api('/notice','POST',ntT??D.notice??''),()=>{ntT=null;return 'Повідомлення збережено'});
-const setMaintenance=enabled=>{D.maintenance=enabled;D.maintenanceUntil='';D.maintenanceMessage=mtT??D.maintenanceMessage??'';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>enabled?'Режим технічних робіт увімкнено без таймера':'Режим технічних робіт вимкнено')};
+const enableMaintenanceForever=()=>{D.maintenance=true;D.maintenanceUntil='';D.maintenanceMessage=mtT??D.maintenanceMessage??'';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Технічні роботи увімкнено без таймера')};
+const disableMaintenance=()=>{D.maintenance=false;D.maintenanceUntil='';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Технічні роботи вимкнено')};
 const localDateTime=iso=>{if(!iso)return '';const d=new Date(iso);return Number.isNaN(d.getTime())?'':new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)};
 const enableMaintenanceUntil=()=>{const value=document.getElementById('maintenanceUntil').value;const end=new Date(value);if(!value||Number.isNaN(end.getTime())||end<=new Date()){msg='Виберіть майбутній час завершення';render();return}D.maintenance=true;D.maintenanceUntil=end.toISOString();D.maintenanceMessage=mtT??D.maintenanceMessage??'';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Технічні роботи ввімкнено до '+end.toLocaleString())};
 const saveMaintenanceMessage=()=>{D.maintenanceMessage=(mtT??D.maintenanceMessage??'').trim().slice(0,500);return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Повідомлення про технічні роботи збережено')};
@@ -73,12 +74,13 @@ function render(){
     <textarea rows="5" oninput="impT=this.value">${esc(impT)}</textarea><button class="btn" onclick="imp()">Імпортувати</button></div>
   <div class="card"><h2>Доступ до вкладки в застосунку</h2><div class="mut">Увімкніть перемикач, щоб показати користувачам вкладку «Адмін» у нижньому меню.</div>
     <label><input type="checkbox" ${D.adminAccess?'checked':''} onchange="setAdminAccess(this.checked)">Показувати вкладку «Адмін»</label></div>
-  <div class="card"><h2>Режим технічних робіт</h2><div class="mut">Можна ввімкнути безстроково або задати час автоматичного завершення.</div>
-    <label><input type="checkbox" ${D.maintenance && !D.maintenanceUntil?'checked':''} onchange="setMaintenance(this.checked)">Увімкнути без таймера</label>
-    <label for="maintenanceUntil">Завершити технічні роботи</label>
+  <div class="card"><h2>Режим технічних робіт</h2><div class="mut">Оберіть окремо режим без таймера або з автоматичним завершенням.</div>
+    ${D.maintenance?`<div class="msg">Технічні роботи увімкнено${D.maintenanceUntil?' до '+esc(new Date(D.maintenanceUntil).toLocaleString()):' без таймера'}</div>`:''}
+    <button class="btn" onclick="enableMaintenanceForever()">Увімкнути без таймера</button>
+    <label for="maintenanceUntil">Час завершення технічних робіт</label>
     <input id="maintenanceUntil" type="datetime-local" value="${localDateTime(D.maintenanceUntil)}">
-    ${D.maintenance && D.maintenanceUntil?`<div class="mut">Режим завершиться автоматично: ${esc(new Date(D.maintenanceUntil).toLocaleString())}</div>`:''}
-    <button class="btn" onclick="enableMaintenanceUntil()">Увімкнути до вибраного часу</button>
+    <button class="btn" onclick="enableMaintenanceUntil()">Увімкнути з таймером</button>
+    <button class="btn d" onclick="disableMaintenance()">Вимкнути технічні роботи</button>
     <textarea rows="2" maxlength="500" placeholder="Повідомлення користувачам" oninput="mtT=this.value">${esc(mtT??D.maintenanceMessage??'')}</textarea>
     <button class="btn" onclick="saveMaintenanceMessage()">Зберегти повідомлення технічних робіт</button></div>
   <div class="card"><h2>Доступ довіреної особи під час технічних робіт</h2>

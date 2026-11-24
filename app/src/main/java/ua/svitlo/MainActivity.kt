@@ -79,6 +79,8 @@ import java.net.URL
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -310,6 +312,7 @@ class VM(app: Application) : AndroidViewModel(app) {
     var notice by mutableStateOf("")
     var maintenance by mutableStateOf(false)
     var maintenanceMessage by mutableStateOf("")
+    var maintenanceUntil by mutableStateOf("")
     var maintenanceBypass by mutableStateOf(false)
     var maintenanceAccessCodeInput by mutableStateOf("")
     var maintenanceAccessStatus by mutableStateOf("")
@@ -345,6 +348,7 @@ class VM(app: Application) : AndroidViewModel(app) {
             adminAccess = data.optBoolean("adminAccess", false)
             maintenance = data.optBoolean("maintenance")
             maintenanceMessage = data.optString("maintenanceMessage")
+            maintenanceUntil = data.optString("maintenanceUntil")
             buildList {
                 if (maintenance) add(maintenanceMessage.ifBlank { "У застосунку тривають технічні роботи. Спробуйте пізніше." })
                 data.optString("notice").takeIf(String::isNotBlank)?.let(::add)
@@ -833,6 +837,16 @@ private fun MaintenanceIllustration() {
 
 @Composable
 private fun MaintenanceScreen(vm: VM) {
+    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(vm.maintenanceUntil) {
+        while (vm.maintenanceUntil.isNotBlank()) {
+            nowMillis = System.currentTimeMillis()
+            delay(1.seconds)
+        }
+    }
+    val maintenanceEndMillis = remember(vm.maintenanceUntil) {
+        runCatching { Instant.parse(vm.maintenanceUntil).toEpochMilli() }.getOrNull()
+    }
     val pageColor = MaterialTheme.colorScheme.background
     val textColor = MaterialTheme.colorScheme.onBackground
     Column(
@@ -865,6 +879,22 @@ private fun MaintenanceScreen(vm: VM) {
             color = textColor,
             style = MaterialTheme.typography.bodyMedium
         )
+        maintenanceEndMillis?.let { endMillis ->
+            Spacer(Modifier.height(12.dp))
+            val remaining = (endMillis - nowMillis).coerceAtLeast(0L)
+            val hours = remaining / 3_600_000
+            val minutes = (remaining / 60_000) % 60
+            val seconds = (remaining / 1_000) % 60
+            val endTime = Instant.ofEpochMilli(endMillis)
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("dd.MM HH:mm"))
+            Text(
+                "До завершення: %02d:%02d:%02d".format(hours, minutes, seconds),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text("Орієнтовно до $endTime", color = textColor, style = MaterialTheme.typography.bodyMedium)
+        }
         Spacer(Modifier.height(24.dp))
         OutlinedTextField(
             value = vm.maintenanceAccessCodeInput,
