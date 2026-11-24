@@ -100,7 +100,10 @@ http.createServer((req, res) => {
   if (req.method === 'OPTIONS') return res.end();
   req.on('data', c => body += c).on('end', () => {
     const json = (c, o) => { res.writeHead(c, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
-    if (req.method === 'GET' && url.pathname === '/schedule') return json(200, read());
+    if (req.method === 'GET' && url.pathname === '/schedule') {
+      const d = read();
+      return json(200, { ...d, serverTime: new Date().toISOString() });
+    }
     if (req.method === 'POST' && url.pathname === '/maintenance-access') {
       const configured = (() => { try { return fs.readFileSync(ACCESS_FILE, 'utf8').trim(); } catch { return ''; } })();
       const submitted = crypto.createHash('sha256').update(body.trim()).digest('hex');

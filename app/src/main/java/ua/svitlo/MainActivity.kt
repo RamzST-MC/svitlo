@@ -345,6 +345,8 @@ class VM(app: Application) : AndroidViewModel(app) {
             if (force) updMsg = "Не вдалося перевірити: ${it.message}"
         }
     }
+    var serverTimeOffsetMillis by mutableStateOf(0L)
+
     fun readNotice() {
         notice = runCatching {
             val data = JSONObject(repo.cache ?: "")
@@ -353,6 +355,13 @@ class VM(app: Application) : AndroidViewModel(app) {
             maintenanceMessage = data.optString("maintenanceMessage")
             maintenanceUntil = data.optString("maintenanceUntil")
             maintenanceTimeZone = data.optString("maintenanceTimeZone")
+            val serverTimeStr = data.optString("serverTime")
+            if (serverTimeStr.isNotBlank()) {
+                runCatching {
+                    val serverMillis = Instant.parse(serverTimeStr).toEpochMilli()
+                    serverTimeOffsetMillis = serverMillis - System.currentTimeMillis()
+                }
+            }
             buildList {
                 if (maintenance) add(maintenanceMessage.ifBlank { "У застосунку тривають технічні роботи. Спробуйте пізніше." })
                 data.optString("notice").takeIf(String::isNotBlank)?.let(::add)
@@ -892,7 +901,8 @@ private fun MaintenanceScreen(vm: VM) {
         )
         maintenanceEndMillis?.let { endMillis ->
             Spacer(Modifier.height(12.dp))
-            val remaining = (endMillis - nowMillis).coerceAtLeast(0L)
+            val adjustedNowMillis = nowMillis + vm.serverTimeOffsetMillis
+            val remaining = (endMillis - adjustedNowMillis).coerceAtLeast(0L)
             val totalSeconds = (remaining + 999) / 1_000
             val hours = totalSeconds / 3_600
             val minutes = (totalSeconds / 60) % 60
