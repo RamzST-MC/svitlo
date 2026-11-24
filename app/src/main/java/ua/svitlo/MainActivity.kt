@@ -248,7 +248,13 @@ class Repo(ctx: Context) {
             }
             val o = JSONObject(c.inputStream.bufferedReader().readText())
             val tag = o.getString("tag_name").trimStart('v', 'V')
-            val v = tag.toIntOrNull() ?: run {
+            val releaseVersionCode = o.optString("body")
+                .lineSequence()
+                .firstOrNull { it.startsWith("Android version code:", ignoreCase = true) }
+                ?.substringAfter(":")
+                ?.trim()
+                ?.toIntOrNull()
+            val v = releaseVersionCode ?: tag.toIntOrNull() ?: run {
                 val parts = tag.split('.').mapNotNull(String::toIntOrNull)
                 if (parts.size !in 2..3) return@runCatching null
                 val (major, minor) = parts

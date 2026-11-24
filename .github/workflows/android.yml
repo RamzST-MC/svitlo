@@ -44,4 +44,5 @@ jobs:
           tag_name: v${{ steps.ver.outputs.name }}
           name: Svitlo v${{ steps.ver.outputs.name }}
           files: svitlo-v${{ steps.ver.outputs.name }}.apk
+          body: "Android version code: ${{ steps.ver.outputs.code }}"
           generate_release_notes: true
