@@ -65,17 +65,29 @@ function hours(str) {
 }
 function parsePost(text) {
   const d = text.match(/(\d{2})\.(\d{2})\.(20\d{2})/); if (!d) return null;
-  const out = {}, re = /Підчерга\s+(\d\.\d)\s*[–—-]\s*([^\n]*)/g; let r;
-  while ((r = re.exec(text))) out[r[1]] = hours(r[2]);
+  const out = {}, re = /(?:Підчерга|Черга)?\s*(\d\.\d)\s*[:–—-]\s*([^\n]*)/gi; let r;
+  while ((r = re.exec(text))) {
+    const q = r[1];
+    if (ALLQ.includes(q)) out[q] = hours(r[2]);
+  }
   if (!Object.keys(out).length) return null;
-  for (const q of ALLQ) out[q] ||= Array(24).fill(0);   // підчерги, яких немає в списку, без відключень
+  for (const q of ALLQ) out[q] ||= Array(24).fill(0);
   return { date: `${d[3]}-${d[2]}-${d[1]}`, out };
 }
 async function syncHoe() {
-  const pages = await Promise.allSettled([getHtml(HOE + '/'), getHtml(HOE + '/post/novini-kompaniji')]);
+  const pages = await Promise.allSettled([
+    getHtml(HOE + '/'),
+    getHtml(HOE + '/post/novini-kompaniji'),
+    getHtml(HOE + '/page/pogodinni-vidkljuchennja')
+  ]);
   const links = [];
   for (const p of pages) if (p.status === 'fulfilled')
-    for (const m of p.value.matchAll(/href="([^"]*\/post\/(?:pogodinni-vidkljuchennja|prognoz-gpv)[^"]*\.html)"/g)) { const u = new URL(m[1], HOE).href; if (!links.includes(u)) links.push(u); }
+    for (const m of p.value.matchAll(/href="([^"]*\/post\/[^"]*\.html)"/gi)) {
+      const u = new URL(m[1], HOE).href;
+      if (!links.includes(u) && (u.includes('pogodinni') || u.includes('prognoz') || u.includes('gpv') || u.includes('vidkljuchennja'))) {
+        links.push(u);
+      }
+    }
   if (!links.length) throw new Error('на hoe.com.ua не знайдено постів з графіками (змінилась верстка?)');
   const data = read(), seen = new Set(), min = new Date(Date.now() - 3 * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Kyiv' });
   for (const u of links.slice(0, 8)) {            // новіші пости йдуть першими; перший для дати виграє
