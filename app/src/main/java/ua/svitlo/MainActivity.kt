@@ -933,6 +933,11 @@ fun UserScreen(vm: VM, refreshCountdown: Int) {
         textAlign = TextAlign.Center
     )
     if (vm.notice.isNotBlank()) Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AMBER.copy(alpha = 0.25f))) { Text(vm.notice, Modifier.padding(12.dp)) }
+    if (vm.maintenance && vm.maintenanceBypass) {
+        OutlinedButton(onClick = { vm.leaveMaintenanceAccess() }, modifier = Modifier.fillMaxWidth()) {
+            Text("Вийти з доступу за кодом")
+        }
+    }
     vm.update?.let { u ->
         val ctx = LocalContext.current
         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = GREEN.copy(alpha = 0.25f))) {
