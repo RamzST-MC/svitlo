@@ -242,7 +242,8 @@ class Repo(ctx: Context) {
         set(v) = sp.edit { putString("maintenance_access_code", v) }
 
     private fun conn(path: String, method: String) = (URL(server.trimEnd('/') + path).openConnection() as HttpURLConnection).apply {
-        requestMethod = method; connectTimeout = 8000; readTimeout = 8000
+        requestMethod = method; connectTimeout = 5000; readTimeout = 5000
+        setRequestProperty("Cache-Control", "no-cache")
     }
     suspend fun load(): Result<Sched> = withContext(Dispatchers.IO) {
         runCatching { val t = conn("/schedule", "GET").inputStream.bufferedReader().readText(); cache = t; parse(t) }
@@ -322,6 +323,7 @@ class VM(app: Application) : AndroidViewModel(app) {
     var update by mutableStateOf<Pair<Int, String>?>(null)
     var updateTestMode by mutableStateOf(false)
     private var lastCheck = 0L
+    private var refreshInProgress = false
     var updMsg by mutableStateOf("")
     val installedVersionCode: Long = BuildConfig.APP_VERSION_CODE.toLong()
     val installedVersionName: String = BuildConfig.APP_VERSION_NAME
@@ -390,18 +392,24 @@ class VM(app: Application) : AndroidViewModel(app) {
     init { repo.cache?.let { runCatching { sched = parse(it) }; readNotice() }; refresh() }
 
     fun refresh() = viewModelScope.launch {
+        if (refreshInProgress) return@launch
+        refreshInProgress = true
         status = "Оновлення…"
-        repo.load().onSuccess {
-            sched = it
-            status = "Оновлено"
-            readNotice()
-            if (maintenance) {
-                maintenanceBypass = repo.maintenanceAccessCode.isNotBlank() && repo.verifyMaintenanceAccess(repo.maintenanceAccessCode)
-            } else {
-                maintenanceBypass = false
-                repo.maintenanceAccessCode = ""
-            }
-        }.onFailure { status = "Немає зв’язку з сервером, показано збережені дані" }
+        try {
+            repo.load().onSuccess {
+                sched = it
+                status = "Оновлено"
+                readNotice()
+                if (maintenance) {
+                    maintenanceBypass = repo.maintenanceAccessCode.isNotBlank() && repo.verifyMaintenanceAccess(repo.maintenanceAccessCode)
+                } else {
+                    maintenanceBypass = false
+                    repo.maintenanceAccessCode = ""
+                }
+            }.onFailure { status = "Немає зв’язку з сервером, показано збережені дані" }
+        } finally {
+            refreshInProgress = false
+        }
     }
     fun day(q: String, date: String) = sched[q]?.get(date) ?: List(24) { 0 }
     fun cycle(q: String, date: String, h: Int) {
@@ -740,7 +748,7 @@ private fun AutoQueueChecker(vm: VM, checkKey: Int) {
 fun App(vm: VM = viewModel()) {
     var tab by remember { mutableIntStateOf(0) }
     var autoCheckKey by remember { mutableIntStateOf(0) }
-    var refreshCountdown by remember { mutableIntStateOf(15) }
+    var refreshCountdown by remember { mutableIntStateOf(3) }
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
         val obs = LifecycleEventObserver { _, e ->
@@ -748,7 +756,7 @@ fun App(vm: VM = viewModel()) {
                 vm.refresh()
                 vm.checkUpdate()
                 autoCheckKey++
-                refreshCountdown = 15
+                refreshCountdown = 3
             }
         }
         owner.lifecycle.addObserver(obs)
@@ -760,7 +768,7 @@ fun App(vm: VM = viewModel()) {
             if (refreshCountdown <= 1) {
                 vm.refresh()
                 autoCheckKey++
-                refreshCountdown = 15
+                refreshCountdown = 3
             } else {
                 refreshCountdown--
             }
