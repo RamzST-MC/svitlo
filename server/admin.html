@@ -46,6 +46,7 @@ const imp=()=>act(()=>api('/import?date='+date,'POST',impT),()=>'Імпорто�
 const notice=()=>act(()=>api('/notice','POST',ntT??D.notice??''),()=>{ntT=null;return 'Повідомлення збережено'});
 const setMaintenance=enabled=>{D.maintenance=enabled;D.maintenanceMessage=mtT??D.maintenanceMessage??'';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>enabled?'Режим технічних робіт увімкнено':'Режим технічних робіт вимкнено')};
 const saveMaintenanceMessage=()=>{D.maintenanceMessage=(mtT??D.maintenanceMessage??'').trim().slice(0,500);return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Повідомлення про технічні роботи збережено')};
+const setAdminAccess=enabled=>{D.adminAccess=enabled;return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>enabled?'Доступ до вкладки «Адмін» увімкнено':'Вкладку «Адмін» приховано')};
 const upd=()=>confirm('Виконати git pull і перезапустити сервер?')&&act(()=>api('/update','POST',''),r=>'git: '+(r.output||'ok')+' (сервер може перезапуститись)');
 function render(){
   const el=document.getElementById('app');
@@ -67,6 +68,8 @@ function render(){
     <button class="btn g" onclick="fill(1)">Усі: немає</button><button class="btn g" onclick="fill(0)">Усі: є</button></div>
   <div class="card"><h2>Імпорт з тексту</h2><div class="mut">Рядки виду <code>Підчерга 1.1 – 06:00-10:00; 14:00-18:00</code> або <code>1.1: 06:00-10:00</code>. Дата: ${date}</div>
     <textarea rows="5" oninput="impT=this.value">${esc(impT)}</textarea><button class="btn" onclick="imp()">Імпортувати</button></div>
+  <div class="card"><h2>Доступ до вкладки в застосунку</h2><div class="mut">Увімкніть перемикач, щоб показати користувачам вкладку «Адмін» у нижньому меню.</div>
+    <label><input type="checkbox" ${D.adminAccess?'checked':''} onchange="setAdminAccess(this.checked)">Показувати вкладку «Адмін»</label></div>
   <div class="card"><h2>Режим технічних робіт</h2><div class="mut">Коли режим увімкнено, застосунок показує лише це повідомлення та блокує інші розділи.</div>
     <label><input type="checkbox" ${D.maintenance?'checked':''} onchange="setMaintenance(this.checked)">Увімкнути режим технічних робіт</label>
     <textarea rows="2" maxlength="500" placeholder="Повідомлення користувачам" oninput="mtT=this.value">${esc(mtT??D.maintenanceMessage??'')}</textarea>

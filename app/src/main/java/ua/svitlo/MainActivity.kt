@@ -284,6 +284,7 @@ class VM(app: Application) : AndroidViewModel(app) {
     var status by mutableStateOf("")
     var queue by mutableStateOf(repo.queue)
     var admin by mutableStateOf(false)
+    var adminAccess by mutableStateOf(false)
     var notice by mutableStateOf("")
     var maintenance by mutableStateOf(false)
     var maintenanceMessage by mutableStateOf("")
@@ -315,6 +316,7 @@ class VM(app: Application) : AndroidViewModel(app) {
     fun readNotice() {
         notice = runCatching {
             val data = JSONObject(repo.cache ?: "")
+            adminAccess = data.optBoolean("adminAccess", false)
             maintenance = data.optBoolean("maintenance")
             maintenanceMessage = data.optString("maintenanceMessage")
             buildList {
@@ -685,6 +687,9 @@ fun App(vm: VM = viewModel()) {
         }
     }
     AutoQueueChecker(vm, autoCheckKey)
+    LaunchedEffect(vm.adminAccess) {
+        if (!vm.adminAccess && tab == 1) tab = 0
+    }
     val appContext = LocalContext.current
     LaunchedEffect(vm.sched, vm.queue, vm.notificationsEnabled, vm.maintenance) {
         if (vm.notificationsEnabled && !vm.maintenance) PowerNotifications.schedule(appContext, vm.queue, vm.sched)
@@ -696,7 +701,11 @@ fun App(vm: VM = viewModel()) {
         Scaffold(bottomBar = {
         NavigationBar {
             NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("💡") }, label = { Text("Графік") })
-            NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("🛠️") }, label = { Text("Адмін") })
+            if (vm.adminAccess) {
+                NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("🛠️") }, label = { Text("Адмін") })
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
             NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = { Text("⚙️") }, label = { Text("Налаштування") })
         }
     }) { pad ->
@@ -1348,9 +1357,6 @@ fun SettingsScreen(vm: VM) {
         ) {
             Text("Перевірити оновлення", fontSize = 18.sp, textAlign = TextAlign.Center)
         }
-    }
-    OutlinedButton(onClick = { vm.checkUpdate(force = true, testMode = true) }) {
-        Text("Тестувати перевірку оновлення")
     }
     if (vm.updMsg.isNotBlank()) Text(vm.updMsg, style = MaterialTheme.typography.bodySmall)
 

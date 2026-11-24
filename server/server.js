@@ -3,7 +3,7 @@
 const http = require('http'), fs = require('fs'), { execFile, execFileSync } = require('child_process');
 const FILE = process.env.DATA_FILE || __dirname + '/../data/schedule.json', TOKEN = process.env.ADMIN_TOKEN || 'change-me', PORT = process.env.PORT || 3000;
 fs.mkdirSync(require('path').dirname(FILE), { recursive: true });
-const read = () => { try { return JSON.parse(fs.readFileSync(FILE)); } catch { return { queues: {}, maintenance: false, maintenanceMessage: '' }; } };
+const read = () => { try { return JSON.parse(fs.readFileSync(FILE)); } catch { return { queues: {}, adminAccess: false, maintenance: false, maintenanceMessage: '' }; } };
 
 // Розбір тексту: "1.1: 00:00-04:00, 12:00-16:00"
 function importText(text, date) {
@@ -94,7 +94,11 @@ http.createServer((req, res) => {
     try {
       if (req.method === 'POST' && url.pathname === '/sync') { return sync().then(() => json(200, { ok: true, lastSync }), e => json(502, { error: e.message })); }
       if (req.method === 'PUT' && url.pathname === '/schedule') {
-        const nd = JSON.parse(body); if (nd.notice === undefined) nd.notice = read().notice || '';
+        const nd = JSON.parse(body), current = read();
+        if (nd.notice === undefined) nd.notice = current.notice || '';
+        if (nd.adminAccess === undefined) nd.adminAccess = current.adminAccess || false;
+        if (nd.maintenance === undefined) nd.maintenance = current.maintenance || false;
+        if (nd.maintenanceMessage === undefined) nd.maintenanceMessage = current.maintenanceMessage || '';
         fs.writeFileSync(FILE, JSON.stringify(nd)); return json(200, { ok: true });
       }
       if (req.method === 'GET' && url.pathname === '/status') {
