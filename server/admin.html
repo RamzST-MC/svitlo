@@ -49,8 +49,7 @@ const disableMaintenance=()=>{D.maintenance=false;D.maintenanceUntil='';D.mainte
 const localDateTime=iso=>{if(!iso)return '';const d=new Date(iso);return Number.isNaN(d.getTime())?'':new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)};
 const enableMaintenanceUntil=()=>{const value=document.getElementById('maintenanceUntil').value;const end=new Date(value);if(!value||Number.isNaN(end.getTime())||end<=new Date()){msg='Виберіть майбутній час завершення';render();return}D.maintenance=true;D.maintenanceUntil=end.toISOString();D.maintenanceTimeZone=Intl.DateTimeFormat().resolvedOptions().timeZone;D.maintenanceMessage=mtT??D.maintenanceMessage??'';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Технічні роботи ввімкнено до '+end.toLocaleString())};
 function enableMaintenanceFor(minutes) {
-  const input = document.getElementById('maintenanceDuration');
-  const duration = Number(minutes === undefined ? input.value : minutes);
+  const duration = Number(minutes);
   if (!Number.isInteger(duration) || duration < 1 || duration > 10080) {
     msg = 'Вкажіть тривалість від 1 до 10080 хвилин'; render(); return;
   }
@@ -59,7 +58,18 @@ function enableMaintenanceFor(minutes) {
   D.maintenanceUntil = end.toISOString();
   D.maintenanceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   D.maintenanceMessage = mtT ?? D.maintenanceMessage ?? '';
-  return act(() => api('/schedule', 'PUT', JSON.stringify(D)), () => 'Технічні роботи увімкнено на ' + duration + ' хв до ' + end.toLocaleString());
+  const hours = Math.floor(duration / 60), mins = duration % 60;
+  const durLabel = (hours ? hours + ' год ' : '') + (mins ? mins + ' хв' : '');
+  return act(() => api('/schedule', 'PUT', JSON.stringify(D)), () => 'Технічні роботи увімкнено на ' + durLabel.trim() + ' до ' + end.toLocaleString());
+}
+function enableMaintenanceFromInput() {
+  const h = Number(document.getElementById('maintenanceHours')?.value || 0);
+  const m = Number(document.getElementById('maintenanceMinutes')?.value || 0);
+  const total = h * 60 + m;
+  if (!Number.isInteger(total) || total < 1 || total > 10080) {
+    msg = 'Вкажіть тривалість від 1 хвилини до 7 днів'; render(); return;
+  }
+  enableMaintenanceFor(total);
 }
 const saveMaintenanceMessage=()=>{D.maintenanceMessage=(mtT??D.maintenanceMessage??'').trim().slice(0,500);return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Повідомлення про технічні роботи збережено')};
 const setAdminAccess=enabled=>{D.adminAccess=enabled;return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>enabled?'Доступ до вкладки «Адмін» увімкнено':'Вкладку «Адмін» приховано')};
@@ -90,9 +100,12 @@ function render(){
   <div class="card"><h2>Режим технічних робіт</h2><div class="mut">Оберіть окремо режим без таймера або з автоматичним завершенням.</div>
     ${D.maintenance?`<div class="msg">Технічні роботи увімкнено${D.maintenanceUntil?' до '+esc(new Date(D.maintenanceUntil).toLocaleString()):' без таймера'}</div>`:''}
     <button class="btn" onclick="enableMaintenanceForever()">Увімкнути без таймера</button>
-    <label for="maintenanceDuration">Тривалість технічних робіт у хвилинах</label>
-    <input id="maintenanceDuration" type="number" min="1" max="10080" step="1" value="60">
-    <button type="button" class="btn" onclick="enableMaintenanceFor(document.getElementById('maintenanceDuration').value)">Увімкнути на вказаний час</button>
+    <label>Тривалість технічних робіт</label>
+    <div style="display:flex;gap:8px;align-items:center;margin:4px 0 8px">
+      <input id="maintenanceHours" type="number" min="0" max="168" step="1" value="2" placeholder="Години" style="width:90px"> год
+      <input id="maintenanceMinutes" type="number" min="0" max="59" step="1" value="0" placeholder="Хвилини" style="width:90px"> хв
+    </div>
+    <button type="button" class="btn" onclick="enableMaintenanceFromInput()">Увімкнути на вказаний час</button>
     <div class="mut">Швидкий вибір тривалості:</div>
     <button type="button" class="btn g" onclick="enableMaintenanceFor(30)">30 хв</button>
     <button type="button" class="btn g" onclick="enableMaintenanceFor(60)">1 год</button>

@@ -856,7 +856,7 @@ private fun MaintenanceScreen(vm: VM) {
         runCatching { Instant.parse(vm.maintenanceUntil).toEpochMilli() }.getOrNull()
     }
     val maintenanceZone = remember(vm.maintenanceTimeZone) {
-        runCatching { ZoneId.of(vm.maintenanceTimeZone) }.getOrElse { ZoneId.of("Europe/Moscow") }
+        runCatching { ZoneId.of(vm.maintenanceTimeZone) }.getOrElse { ZoneId.systemDefault() }
     }
     val pageColor = MaterialTheme.colorScheme.background
     val textColor = MaterialTheme.colorScheme.onBackground
@@ -893,9 +893,10 @@ private fun MaintenanceScreen(vm: VM) {
         maintenanceEndMillis?.let { endMillis ->
             Spacer(Modifier.height(12.dp))
             val remaining = (endMillis - nowMillis).coerceAtLeast(0L)
-            val hours = remaining / 3_600_000
-            val minutes = (remaining / 60_000) % 60
-            val seconds = (remaining / 1_000) % 60
+            val totalSeconds = (remaining + 999) / 1_000
+            val hours = totalSeconds / 3_600
+            val minutes = (totalSeconds / 60) % 60
+            val seconds = totalSeconds % 60
             val endTime = Instant.ofEpochMilli(endMillis)
                 .atZone(maintenanceZone)
                 .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
