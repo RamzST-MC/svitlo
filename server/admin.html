@@ -48,6 +48,7 @@ const enableMaintenanceForever=()=>{D.maintenance=true;D.maintenanceUntil='';D.m
 const disableMaintenance=()=>{D.maintenance=false;D.maintenanceUntil='';D.maintenanceTimeZone='';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Технічні роботи вимкнено')};
 const localDateTime=iso=>{if(!iso)return '';const d=new Date(iso);return Number.isNaN(d.getTime())?'':new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)};
 const enableMaintenanceUntil=()=>{const value=document.getElementById('maintenanceUntil').value;const end=new Date(value);if(!value||Number.isNaN(end.getTime())||end<=new Date()){msg='Виберіть майбутній час завершення';render();return}D.maintenance=true;D.maintenanceUntil=end.toISOString();D.maintenanceTimeZone=Intl.DateTimeFormat().resolvedOptions().timeZone;D.maintenanceMessage=mtT??D.maintenanceMessage??'';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Технічні роботи ввімкнено до '+end.toLocaleString())};
+const enableMaintenanceFor=minutes=>{const duration=Number(minutes??document.getElementById('maintenanceDuration').value);if(!Number.isInteger(duration)||duration<1||duration>10080){msg='Вкажіть тривалість від 1 до 10080 хвилин';render();return}const end=new Date(Date.now()+duration*60000);D.maintenance=true;D.maintenanceUntil=end.toISOString();D.maintenanceTimeZone=Intl.DateTimeFormat().resolvedOptions().timeZone;D.maintenanceMessage=mtT??D.maintenanceMessage??'';return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Технічні роботи ввімкнено на '+duration+' хв до '+end.toLocaleString())};
 const saveMaintenanceMessage=()=>{D.maintenanceMessage=(mtT??D.maintenanceMessage??'').trim().slice(0,500);return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>'Повідомлення про технічні роботи збережено')};
 const setAdminAccess=enabled=>{D.adminAccess=enabled;return act(()=>api('/schedule','PUT',JSON.stringify(D)),()=>enabled?'Доступ до вкладки «Адмін» увімкнено':'Вкладку «Адмін» приховано')};
 const saveMaintenanceAccess=()=>{const code=acT.trim();return act(()=>api('/maintenance-access-config','POST',code),()=>{acT='';return code?'Код доступу збережено — передайте його потрібній людині':'Код доступу видалено'})};
@@ -77,9 +78,19 @@ function render(){
   <div class="card"><h2>Режим технічних робіт</h2><div class="mut">Оберіть окремо режим без таймера або з автоматичним завершенням.</div>
     ${D.maintenance?`<div class="msg">Технічні роботи увімкнено${D.maintenanceUntil?' до '+esc(new Date(D.maintenanceUntil).toLocaleString()):' без таймера'}</div>`:''}
     <button class="btn" onclick="enableMaintenanceForever()">Увімкнути без таймера</button>
-    <label for="maintenanceUntil">Час завершення технічних робіт</label>
-    <input id="maintenanceUntil" type="datetime-local" value="${localDateTime(D.maintenanceUntil)}">
-    <button class="btn" onclick="enableMaintenanceUntil()">Увімкнути з таймером</button>
+    <label for="maintenanceDuration">Тривалість технічних робіт у хвилинах</label>
+    <input id="maintenanceDuration" type="number" min="1" max="10080" step="1" value="60">
+    <button class="btn" onclick="enableMaintenanceFor()">Увімкнути на вказаний час</button>
+    <div class="mut">Швидкий вибір тривалості:</div>
+    <button class="btn g" onclick="enableMaintenanceFor(30)">30 хв</button>
+    <button class="btn g" onclick="enableMaintenanceFor(60)">1 год</button>
+    <button class="btn g" onclick="enableMaintenanceFor(120)">2 год</button>
+    <button class="btn g" onclick="enableMaintenanceFor(330)">5 год 30 хв</button>
+    <details><summary>Вибрати точний час завершення</summary>
+      <label for="maintenanceUntil">Час завершення технічних робіт</label>
+      <input id="maintenanceUntil" type="datetime-local" value="${localDateTime(D.maintenanceUntil)}">
+      <button class="btn" onclick="enableMaintenanceUntil()">Увімкнути до вибраного часу</button>
+    </details>
     <button class="btn d" onclick="disableMaintenance()">Вимкнути технічні роботи</button>
     <textarea rows="2" maxlength="500" placeholder="Повідомлення користувачам" oninput="mtT=this.value">${esc(mtT??D.maintenanceMessage??'')}</textarea>
     <button class="btn" onclick="saveMaintenanceMessage()">Зберегти повідомлення технічних робіт</button></div>
